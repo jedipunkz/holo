@@ -42,9 +42,10 @@ func TestFilter(t *testing.T) {
 	sessions := []Session{
 		{Title: "deploy pipeline", CWD: "/w/infra"},
 		{Title: "login fix", CWD: "/w/holo", Body: "kyber crystal found"},
-		{Title: "other", CWD: "/w/misc", Body: "nothing"},
+		{Title: "other", CWD: "/w/misc", Body: "nothing", ID: "2261faae-59c6"},
+		{Title: "mentions id", CWD: "/w/x", Body: "see 2261faae-59c6"},
 	}
-	if got := filter(sessions, ""); len(got) != 3 {
+	if got := filter(sessions, ""); len(got) != 4 {
 		t.Errorf("empty query: %v", got)
 	}
 	if got := filter(sessions, "lgnfx"); len(got) != 1 || got[0].idx != 1 {
@@ -55,6 +56,9 @@ func TestFilter(t *testing.T) {
 	}
 	if got := filter(sessions, "crystal kyber"); len(got) != 1 || got[0].idx != 1 {
 		t.Errorf("body terms: %v", got)
+	}
+	if got := filter(sessions, "2261FAAE"); len(got) != 2 || got[0].idx != 2 || got[1].idx != 3 {
+		t.Errorf("id prefix before body: %v", got)
 	}
 }
 

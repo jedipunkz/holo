@@ -74,7 +74,9 @@ Given the query in the search box:
 2. Fuzzy match ([sahilm/fuzzy](https://github.com/sahilm/fuzzy)) against
    `title + project + branch`, ordered by score. Prompts are kept out of this
    haystack because long text matches almost any subsequence.
-3. Then sessions not matched above whose `Body` contains every
+3. Then sessions not matched above whose `ID` starts with the query
+   (case-insensitive), newest first.
+4. Then sessions not matched above whose `Body` contains every
    whitespace-separated query term (case-insensitive), newest first.
 
 ## TUI

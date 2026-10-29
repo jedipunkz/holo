@@ -40,7 +40,8 @@ func header(s Session) string {
 
 // filter returns the sessions matching query.
 // Fuzzy matches on title/project/branch come first (by score), then sessions
-// whose body contains every query term (newest first). Prompts stay out of the
+// whose ID starts with the query, then sessions whose body contains every
+// query term (newest first). Prompts stay out of the
 // fuzzy haystack because long text matches almost any subsequence.
 func filter(sessions []Session, query string) []match {
 	query = strings.TrimSpace(query)
@@ -62,7 +63,15 @@ func filter(sessions []Session, query string) []match {
 		seen[m.Index] = true
 	}
 
-	terms := strings.Fields(strings.ToLower(query))
+	q := strings.ToLower(query)
+	for i, s := range sessions {
+		if !seen[i] && strings.HasPrefix(s.ID, q) {
+			res = append(res, match{idx: i})
+			seen[i] = true
+		}
+	}
+
+	terms := strings.Fields(q)
 	for i, s := range sessions {
 		if seen[i] {
 			continue

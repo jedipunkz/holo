@@ -135,7 +135,9 @@ holo ls --json     print sessions as JSON (Body excluded)
 | `main.go`         | argument handling, `ls`, resume via exec         |
 | `session.go`      | JSONL parsing and `LoadSessions`                 |
 | `tui.go`          | search filter and Bubble Tea model               |
-| `session_test.go` | parse and filter tests                           |
+| `session_test.go` | JSONL parsing and `LoadSessions` tests           |
+| `tui_test.go`     | filter, rendering, key handling and view tests   |
+| `main_test.go`    | `projectsDir`, `ls`, `run` and `resume` errors   |
 
 ## Risks
 

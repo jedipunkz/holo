@@ -127,13 +127,11 @@ func (m *model) move(d int) {
 	}
 }
 
-// listHeight is the screen height minus the input line and two footer lines.
+// listHeight is the screen height minus the two info lines and the input line.
 func (m model) listHeight() int { return max(1, m.height-3) }
 
 func (m model) View() tea.View {
 	var b strings.Builder
-	b.WriteString(m.input.View() + "\n")
-
 	rows := m.listHeight()
 	for i := m.offset; i < min(len(m.matches), m.offset+rows); i++ {
 		line := m.row(m.sessions[m.matches[i]])
@@ -152,7 +150,8 @@ func (m model) View() tea.View {
 		detail = s.CWD + "  " + s.ID
 	}
 	b.WriteString(dimStyle.Render(ansi.Truncate(detail, m.width, "…")) + "\n")
-	b.WriteString(dimStyle.Render(fmt.Sprintf("%d/%d  enter: resume  ↑↓/ctrl+p,n: move  esc: quit", len(m.matches), len(m.sessions))))
+	b.WriteString(dimStyle.Render(fmt.Sprintf("%d/%d  enter: resume  ↑↓/ctrl+p,n: move  esc: quit", len(m.matches), len(m.sessions))) + "\n")
+	b.WriteString(m.input.View())
 
 	v := tea.NewView(b.String())
 	v.AltScreen = true

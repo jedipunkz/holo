@@ -83,11 +83,11 @@ Built with [Bubble Tea v2](https://charm.land/bubbletea), Bubbles v2
 `textinput`, and Lip Gloss v2. Runs in the alternate screen.
 
 ```
-> search box
 MM-DD HH:MM  project               branch            title
 ...
 <cwd>  <session-id>                      (selected session)
 <matches>/<total>  enter: resume  ↑↓/ctrl+p,n: move  esc: quit
+> search box
 ```
 
 | Key                 | Action                         |

@@ -3,7 +3,9 @@ package main
 import (
 	"fmt"
 	"path/filepath"
+	"slices"
 	"strings"
+	"unicode/utf8"
 
 	"charm.land/bubbles/v2/textinput"
 	tea "charm.land/bubbletea/v2"
@@ -15,29 +17,41 @@ import (
 var (
 	selectedStyle = lipgloss.NewStyle().Reverse(true)
 	dimStyle      = lipgloss.NewStyle().Faint(true)
+	matchColor    = lipgloss.Color("208") // orange
 )
 
-// filter returns indexes into sessions matching query.
+// match is a filtered session. pos holds fuzzy-matched byte offsets into
+// header(s); it is empty for body matches.
+type match struct {
+	idx int
+	pos []int
+}
+
+func header(s Session) string {
+	return strings.Join([]string{s.Title, project(s.CWD), s.Branch}, " ")
+}
+
+// filter returns the sessions matching query.
 // Fuzzy matches on title/project/branch come first (by score), then sessions
 // whose body contains every query term (newest first). Prompts stay out of the
 // fuzzy haystack because long text matches almost any subsequence.
-func filter(sessions []Session, query string) []int {
+func filter(sessions []Session, query string) []match {
 	query = strings.TrimSpace(query)
-	idx := make([]int, 0, len(sessions))
+	res := make([]match, 0, len(sessions))
 	if query == "" {
 		for i := range sessions {
-			idx = append(idx, i)
+			res = append(res, match{idx: i})
 		}
-		return idx
+		return res
 	}
 
 	headers := make([]string, len(sessions))
 	for i, s := range sessions {
-		headers[i] = strings.Join([]string{s.Title, project(s.CWD), s.Branch}, " ")
+		headers[i] = header(s)
 	}
 	seen := make(map[int]bool)
 	for _, m := range fuzzy.Find(query, headers) {
-		idx = append(idx, m.Index)
+		res = append(res, match{idx: m.Index, pos: m.MatchedIndexes})
 		seen[m.Index] = true
 	}
 
@@ -54,15 +68,15 @@ func filter(sessions []Session, query string) []int {
 			}
 		}
 		if all {
-			idx = append(idx, i)
+			res = append(res, match{idx: i})
 		}
 	}
-	return idx
+	return res
 }
 
 type model struct {
 	sessions []Session
-	matches  []int
+	matches  []match
 	cursor   int
 	offset   int
 	input    textinput.Model
@@ -94,7 +108,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		case "enter":
 			if len(m.matches) > 0 {
-				s := m.sessions[m.matches[m.cursor]]
+				s := m.sessions[m.matches[m.cursor].idx]
 				m.chosen = &s
 			}
 			return m, tea.Quit
@@ -134,11 +148,11 @@ func (m model) View() tea.View {
 	var b strings.Builder
 	rows := m.listHeight()
 	for i := m.offset; i < min(len(m.matches), m.offset+rows); i++ {
-		line := m.row(m.sessions[m.matches[i]])
+		base := lipgloss.NewStyle()
 		if i == m.cursor {
-			line = selectedStyle.Render(line)
+			base = selectedStyle
 		}
-		b.WriteString(line + "\n")
+		b.WriteString(m.row(m.matches[i], base) + "\n")
 	}
 	for i := len(m.matches) - m.offset; i < rows; i++ {
 		b.WriteString("\n")
@@ -146,7 +160,7 @@ func (m model) View() tea.View {
 
 	detail := ""
 	if len(m.matches) > 0 {
-		s := m.sessions[m.matches[m.cursor]]
+		s := m.sessions[m.matches[m.cursor].idx]
 		detail = s.CWD + "  " + s.ID
 	}
 	b.WriteString(dimStyle.Render(ansi.Truncate(detail, m.width, "…")) + "\n")
@@ -158,19 +172,49 @@ func (m model) View() tea.View {
 	return v
 }
 
-func (m model) row(s Session) string {
-	line := fmt.Sprintf("%s  %s  %s  %s",
-		s.Updated.Local().Format("01-02 15:04"),
-		pad(project(s.CWD), 20),
-		pad(s.Branch, 16),
-		s.Title)
-	return pad(line, m.width)
+// row renders one list line in base style, with fuzzy-matched characters in
+// matchColor. Each segment is styled separately so the selection's reverse
+// video is not cut off by a highlight's reset sequence.
+func (m model) row(mt match, base lipgloss.Style) string {
+	s := m.sessions[mt.idx]
+	hl := base.Foreground(matchColor)
+	date := s.Updated.Local().Format("01-02 15:04")
+	proj := project(s.CWD)
+	sep := base.Render("  ")
+	titleW := max(0, m.width-len(date)-20-16-3*len("  "))
+	line := base.Render(date) + sep +
+		mark(proj, 20, mt.pos, len(s.Title)+1, base, hl) + sep +
+		mark(s.Branch, 16, mt.pos, len(s.Title)+1+len(proj)+1, base, hl) + sep +
+		mark(s.Title, titleW, mt.pos, 0, base, hl)
+	return ansi.Truncate(line, m.width, "")
 }
 
-// pad truncates or right-pads s to display width w (CJK-aware).
-func pad(s string, w int) string {
-	s = ansi.Truncate(s, w, "…")
-	return s + strings.Repeat(" ", max(0, w-ansi.StringWidth(s)))
+// mark truncates or right-pads text to display width w (CJK-aware), rendering bytes whose
+// header offset (off+i) is in pos with hl and the rest with base.
+func mark(text string, w int, pos []int, off int, base, hl lipgloss.Style) string {
+	t := ansi.Truncate(text, w, "…")
+	visible := len(t)
+	if t != text {
+		visible -= len("…")
+	}
+	on := func(i int) bool { return i < visible && slices.Contains(pos, off+i) }
+
+	var b strings.Builder
+	for i := 0; i < len(t); {
+		j := i
+		for j < len(t) && on(j) == on(i) {
+			_, n := utf8.DecodeRuneInString(t[j:])
+			j += n
+		}
+		st := base
+		if on(i) {
+			st = hl
+		}
+		b.WriteString(st.Render(t[i:j]))
+		i = j
+	}
+	b.WriteString(base.Render(strings.Repeat(" ", max(0, w-ansi.StringWidth(t)))))
+	return b.String()
 }
 
 func project(cwd string) string { return filepath.Base(cwd) }

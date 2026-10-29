@@ -99,6 +99,8 @@ MM-DD HH:MM  project               branch            title
 | `esc` / `ctrl+c`    | quit                           |
 
 Columns are truncated and padded by display width, so CJK titles align.
+Characters matched by the fuzzy search (title, project, branch) are shown in
+orange (ANSI 208). Body-only matches are not highlighted.
 
 ## Resume
 

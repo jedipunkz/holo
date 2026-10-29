@@ -3,6 +3,9 @@ package main
 import (
 	"strings"
 	"testing"
+
+	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 )
 
 const sample = `{"type":"user","sessionId":"abc","cwd":"/w/holo","gitBranch":"main","timestamp":"2026-10-01T00:00:00Z","isMeta":true,"message":{"content":"meta stuff"}}
@@ -44,13 +47,26 @@ func TestFilter(t *testing.T) {
 	if got := filter(sessions, ""); len(got) != 3 {
 		t.Errorf("empty query: %v", got)
 	}
-	if got := filter(sessions, "lgnfx"); len(got) != 1 || got[0] != 1 {
+	if got := filter(sessions, "lgnfx"); len(got) != 1 || got[0].idx != 1 {
 		t.Errorf("fuzzy title: %v", got)
 	}
-	if got := filter(sessions, "infra"); len(got) != 1 || got[0] != 0 {
+	if got := filter(sessions, "infra"); len(got) != 1 || got[0].idx != 0 {
 		t.Errorf("fuzzy project: %v", got)
 	}
-	if got := filter(sessions, "crystal kyber"); len(got) != 1 || got[0] != 1 {
+	if got := filter(sessions, "crystal kyber"); len(got) != 1 || got[0].idx != 1 {
 		t.Errorf("body terms: %v", got)
+	}
+}
+
+func TestRowHighlight(t *testing.T) {
+	m := model{sessions: []Session{{Title: "login fix", CWD: "/w/holo", Branch: "main"}}, width: 80}
+	mt := filter(m.sessions, "holo")[0]
+	line := m.row(mt, lipgloss.NewStyle())
+	if got := ansi.StringWidth(line); got != 80 {
+		t.Errorf("width: %d", got)
+	}
+	hl := lipgloss.NewStyle().Foreground(matchColor).Render("holo")
+	if !strings.Contains(line, hl) {
+		t.Errorf("project not highlighted: %q", line)
 	}
 }

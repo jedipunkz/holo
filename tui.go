@@ -15,12 +15,14 @@ import (
 )
 
 var (
-	matchColor   = lipgloss.Color("208") // orange; also the accent color
-	dateColor    = lipgloss.Color("245")
-	projectColor = lipgloss.Color("39")
-	branchColor  = lipgloss.Color("170")
-	selectedBg   = lipgloss.Color("236")
-	dimStyle     = lipgloss.NewStyle().Faint(true)
+	// gruvbox dark palette
+	matchColor   = lipgloss.Color("#fe8019") // orange; also the accent color
+	dateColor    = lipgloss.Color("#928374") // gray
+	projectColor = lipgloss.Color("#83a598") // blue
+	branchColor  = lipgloss.Color("#d3869b") // purple
+	titleColor   = lipgloss.Color("#ebdbb2") // fg
+	selectedBg   = lipgloss.Color("#3c3836") // bg1
+	dimStyle     = lipgloss.NewStyle().Foreground(dateColor)
 	keyStyle     = lipgloss.NewStyle().Bold(true).Foreground(matchColor)
 	inputBox     = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(matchColor)
 )
@@ -199,7 +201,7 @@ func (m model) row(mt match, selected bool) string {
 	line := base.Foreground(matchColor).Render(marker) + base.Foreground(dateColor).Render(date) + sep +
 		mark(proj, 20, mt.pos, len(s.Title)+1, base.Foreground(projectColor), hl) + sep +
 		mark(s.Branch, 16, mt.pos, len(s.Title)+1+len(proj)+1, base.Foreground(branchColor), hl) + sep +
-		mark(s.Title, titleW, mt.pos, 0, base, hl)
+		mark(s.Title, titleW, mt.pos, 0, base.Foreground(titleColor), hl)
 	return ansi.Truncate(line, m.width, "")
 }
 

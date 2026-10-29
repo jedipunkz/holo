@@ -3,6 +3,10 @@ package main
 import (
 	"strings"
 	"testing"
+	"time"
+
+	"charm.land/lipgloss/v2"
+	"github.com/charmbracelet/x/ansi"
 )
 
 const sample = `{"type":"user","sessionId":"abc","cwd":"/w/holo","gitBranch":"main","timestamp":"2026-10-01T00:00:00Z","isMeta":true,"message":{"content":"meta stuff"}}
@@ -39,18 +43,50 @@ func TestFilter(t *testing.T) {
 	sessions := []Session{
 		{Title: "deploy pipeline", CWD: "/w/infra"},
 		{Title: "login fix", CWD: "/w/holo", Body: "kyber crystal found"},
-		{Title: "other", CWD: "/w/misc", Body: "nothing"},
+		{Title: "other", CWD: "/w/misc", Body: "nothing", ID: "2261faae-59c6"},
+		{Title: "mentions id", CWD: "/w/x", Body: "see 2261faae-59c6"},
 	}
-	if got := filter(sessions, ""); len(got) != 3 {
+	if got := filter(sessions, ""); len(got) != 4 {
 		t.Errorf("empty query: %v", got)
 	}
-	if got := filter(sessions, "lgnfx"); len(got) != 1 || got[0] != 1 {
+	if got := filter(sessions, "lgnfx"); len(got) != 1 || got[0].idx != 1 {
 		t.Errorf("fuzzy title: %v", got)
 	}
-	if got := filter(sessions, "infra"); len(got) != 1 || got[0] != 0 {
+	if got := filter(sessions, "infra"); len(got) != 1 || got[0].idx != 0 {
 		t.Errorf("fuzzy project: %v", got)
 	}
-	if got := filter(sessions, "crystal kyber"); len(got) != 1 || got[0] != 1 {
+	if got := filter(sessions, "crystal kyber"); len(got) != 1 || got[0].idx != 1 {
 		t.Errorf("body terms: %v", got)
+	}
+	if got := filter(sessions, "2261FAAE"); len(got) != 2 || got[0].idx != 2 || got[1].idx != 3 {
+		t.Errorf("id prefix before body: %v", got)
+	}
+}
+
+func TestAgo(t *testing.T) {
+	for d, want := range map[time.Duration]string{
+		30 * time.Second:     "now",
+		59 * time.Minute:     "59m ago",
+		23 * time.Hour:       "23h ago",
+		29 * 24 * time.Hour:  "29d ago",
+		364 * 24 * time.Hour: "12mo ago",
+		800 * 24 * time.Hour: "2y ago",
+	} {
+		if got := ago(d); got != want {
+			t.Errorf("ago(%v) = %q, want %q", d, got, want)
+		}
+	}
+}
+
+func TestRowHighlight(t *testing.T) {
+	m := model{sessions: []Session{{Title: "login fix", CWD: "/w/holo", Branch: "main"}}, width: 80}
+	mt := filter(m.sessions, "holo")[0]
+	line := m.row(mt, false)
+	if got := ansi.StringWidth(line); got != 80 {
+		t.Errorf("width: %d", got)
+	}
+	hl := lipgloss.NewStyle().Foreground(matchColor).Bold(true).Render("holo")
+	if !strings.Contains(line, hl) {
+		t.Errorf("project not highlighted: %q", line)
 	}
 }

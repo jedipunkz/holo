@@ -74,7 +74,9 @@ Given the query in the search box:
 2. Fuzzy match ([sahilm/fuzzy](https://github.com/sahilm/fuzzy)) against
    `title + project + branch`, ordered by score. Prompts are kept out of this
    haystack because long text matches almost any subsequence.
-3. Then sessions not matched above whose `Body` contains every
+3. Then sessions not matched above whose `ID` starts with the query
+   (case-insensitive), newest first.
+4. Then sessions not matched above whose `Body` contains every
    whitespace-separated query term (case-insensitive), newest first.
 
 ## TUI
@@ -83,22 +85,33 @@ Built with [Bubble Tea v2](https://charm.land/bubbletea), Bubbles v2
 `textinput`, and Lip Gloss v2. Runs in the alternate screen.
 
 ```
-> search box
-MM-DD HH:MM  project               branch            title
+╭──────────────────────────────────────────────╮
+│<cwd>  <session-id>          <matches>/<total>│   (selected session)
+╰──────────────────────────────────────────────╯
 ...
-<cwd>  <session-id>                      (selected session)
-<matches>/<total>  enter: resume  ↑↓/ctrl+p,n: move  esc: quit
+▌MM-DD HH:MM   3h ago  project               branch            title   (best match / newest)
+╭──────────────────────────────────────────────╮
+│❯ search box                                  │
+╰──────────────────────────────────────────────╯
 ```
 
 | Key                 | Action                         |
 |---------------------|--------------------------------|
-| typing              | refilter, cursor back to top   |
-| `↑` / `ctrl+p`      | move up                        |
-| `↓` / `ctrl+n`      | move down                      |
+| typing              | refilter, cursor back to bottom |
+| `↑` / `ctrl+p`      | move up (next match)           |
+| `↓` / `ctrl+n`      | move down (previous match)     |
 | `enter`             | resume the selected session    |
 | `esc` / `ctrl+c`    | quit                           |
 
+The list is drawn bottom-up like fzf: the best match (or the newest session
+for an empty query) is on the bottom row and selected first.
+
 Columns are truncated and padded by display width, so CJK titles align.
+Colors follow the gruvbox dark palette: accent and fuzzy-matched characters
+orange `#fe8019` (matches bold), date and dim text gray `#928374`, relative time yellow `#fabd2f`, project blue
+`#83a598`, branch purple `#d3869b`, title fg `#ebdbb2`, selected row background
+bg1 `#3c3836` with a `▌` marker. Body-only matches are not highlighted. The palette assumes a dark
+terminal background.
 
 ## Resume
 

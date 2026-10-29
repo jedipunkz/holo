@@ -147,6 +147,14 @@ func (m model) listHeight() int { return max(1, m.height-3) }
 
 func (m model) View() tea.View {
 	var b strings.Builder
+	b.WriteString(dimStyle.Render(fmt.Sprintf("%d/%d  enter: resume  ↑↓/ctrl+p,n: move  esc: quit", len(m.matches), len(m.sessions))) + "\n")
+	detail := ""
+	if len(m.matches) > 0 {
+		s := m.sessions[m.matches[m.cursor].idx]
+		detail = s.CWD + "  " + s.ID
+	}
+	b.WriteString(dimStyle.Render(ansi.Truncate(detail, m.width, "…")) + "\n")
+
 	// Best match (index 0) sits on the bottom row, just above the input like fzf.
 	rows := m.listHeight()
 	for i := m.offset + rows - 1; i >= m.offset; i-- {
@@ -160,14 +168,6 @@ func (m model) View() tea.View {
 		}
 		b.WriteString(m.row(m.matches[i], base) + "\n")
 	}
-
-	detail := ""
-	if len(m.matches) > 0 {
-		s := m.sessions[m.matches[m.cursor].idx]
-		detail = s.CWD + "  " + s.ID
-	}
-	b.WriteString(dimStyle.Render(ansi.Truncate(detail, m.width, "…")) + "\n")
-	b.WriteString(dimStyle.Render(fmt.Sprintf("%d/%d  enter: resume  ↑↓/ctrl+p,n: move  esc: quit", len(m.matches), len(m.sessions))) + "\n")
 	b.WriteString(m.input.View())
 
 	v := tea.NewView(b.String())

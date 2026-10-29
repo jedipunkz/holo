@@ -138,6 +138,7 @@ holo ls --json     print sessions as JSON (Body excluded)
 | `session_test.go` | JSONL parsing and `LoadSessions` tests           |
 | `tui_test.go`     | filter, rendering, key handling and view tests   |
 | `main_test.go`    | `projectsDir`, `ls`, `run` and `resume` errors   |
+| `bench_test.go`   | benchmarks on synthetic sessions (`make perf`)   |
 
 ## Risks
 

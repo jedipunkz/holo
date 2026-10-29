@@ -70,6 +70,7 @@ background.
 ```sh
 make          # go build -o holo .
 make test     # go test -race ./...
+make perf     # benchmarks on synthetic data
 make update   # go get -u ./... && go mod tidy
 ```
 

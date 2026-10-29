@@ -7,18 +7,6 @@ lists them in a TUI, and runs `claude --resume <id>` in the session's working
 directory when you pick one. It never writes to the Claude Code config
 directory.
 
-```
-╭────────────────────────────────────────────────────────────────────────────────────────╮
-│/Users/you/src/holo  2261faae-59c6-413a-b3c9-f5e53e857775                          46/46│
-╰────────────────────────────────────────────────────────────────────────────────────────╯
- 10-28 22:06  22h ago  dotfiles              main              Clean up config.fish
- 10-29 20:05  24m ago  resume-tmo            HEAD              Name ideas for the CLI
-▌10-29 20:29      now  holo                  main              Add README
-╭────────────────────────────────────────────────────────────────────────────────────────╮
-│❯ search sessions                                                                       │
-╰────────────────────────────────────────────────────────────────────────────────────────╯
-```
-
 ## Requirements
 
 - Go 1.27.3 or later (to build)

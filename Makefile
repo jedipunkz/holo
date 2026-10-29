@@ -1,7 +1,10 @@
-.PHONY: build install update dev-install
+.PHONY: build test install update dev-install
 
 build:
 	go build -o holo .
+
+test:
+	go test -race ./...
 
 install:
 	go install .

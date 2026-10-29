@@ -23,8 +23,7 @@ var (
 	titleColor   = lipgloss.Color("#ebdbb2") // fg
 	selectedBg   = lipgloss.Color("#3c3836") // bg1
 	dimStyle     = lipgloss.NewStyle().Foreground(dateColor)
-	keyStyle     = lipgloss.NewStyle().Bold(true).Foreground(matchColor)
-	inputBox     = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(matchColor)
+	box          = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(matchColor)
 )
 
 // match is a filtered session. pos holds fuzzy-matched byte offsets into
@@ -161,21 +160,22 @@ func (m *model) move(d int) {
 	}
 }
 
-// listHeight is the screen height minus the two info lines and the 3-line input box.
-func (m model) listHeight() int { return max(1, m.height-5) }
+// listHeight is the screen height minus the 3-line detail and input boxes.
+func (m model) listHeight() int { return max(1, m.height-6) }
 
 func (m model) View() tea.View {
 	var b strings.Builder
-	key := func(k, desc string) string { return keyStyle.Render(k) + " " + dimStyle.Render(desc) }
-	help := strings.Join([]string{key("enter", "resume"), key("↑↓/ctrl+p,n", "move"), key("esc", "quit"),
-		dimStyle.Render(fmt.Sprintf("%d/%d", len(m.matches), len(m.sessions)))}, "  ")
-	b.WriteString(ansi.Truncate(help, m.width, "…") + "\n")
+	// Detail box: selected session on the left, match count on the right.
+	inner := max(0, m.width-2)
+	count := dimStyle.Render(fmt.Sprintf("%d/%d", len(m.matches), len(m.sessions)))
 	detail := ""
 	if len(m.matches) > 0 {
 		s := m.sessions[m.matches[m.cursor].idx]
 		detail = lipgloss.NewStyle().Foreground(projectColor).Render(s.CWD) + "  " + dimStyle.Render(s.ID)
 	}
-	b.WriteString(ansi.Truncate(detail, m.width, "…") + "\n")
+	detail = ansi.Truncate(detail, max(0, inner-ansi.StringWidth(count)-2), "…")
+	gap := strings.Repeat(" ", max(0, inner-ansi.StringWidth(detail)-ansi.StringWidth(count)))
+	b.WriteString(box.Width(m.width).Render(detail+gap+count) + "\n")
 
 	// Best match (index 0) sits on the bottom row, just above the input like fzf.
 	rows := m.listHeight()
@@ -186,7 +186,7 @@ func (m model) View() tea.View {
 		}
 		b.WriteString(m.row(m.matches[i], i == m.cursor) + "\n")
 	}
-	b.WriteString(inputBox.Width(m.width).Render(m.input.View()))
+	b.WriteString(box.Width(m.width).Render(m.input.View()))
 
 	v := tea.NewView(b.String())
 	v.AltScreen = true

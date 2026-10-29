@@ -85,8 +85,9 @@ Built with [Bubble Tea v2](https://charm.land/bubbletea), Bubbles v2
 `textinput`, and Lip Gloss v2. Runs in the alternate screen.
 
 ```
-<matches>/<total>  enter: resume  ↑↓/ctrl+p,n: move  esc: quit
-<cwd>  <session-id>                      (selected session)
+╭──────────────────────────────────────────────╮
+│<cwd>  <session-id>          <matches>/<total>│   (selected session)
+╰──────────────────────────────────────────────╯
 ...
 ▌MM-DD HH:MM  project               branch            title   (best match / newest)
 ╭──────────────────────────────────────────────╮

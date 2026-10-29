@@ -15,9 +15,14 @@ import (
 )
 
 var (
-	selectedStyle = lipgloss.NewStyle().Reverse(true)
-	dimStyle      = lipgloss.NewStyle().Faint(true)
-	matchColor    = lipgloss.Color("208") // orange
+	matchColor   = lipgloss.Color("208") // orange; also the accent color
+	dateColor    = lipgloss.Color("245")
+	projectColor = lipgloss.Color("39")
+	branchColor  = lipgloss.Color("170")
+	selectedBg   = lipgloss.Color("236")
+	dimStyle     = lipgloss.NewStyle().Faint(true)
+	keyStyle     = lipgloss.NewStyle().Bold(true).Foreground(matchColor)
+	inputBox     = lipgloss.NewStyle().Border(lipgloss.RoundedBorder()).BorderForeground(matchColor)
 )
 
 // match is a filtered session. pos holds fuzzy-matched byte offsets into
@@ -87,7 +92,10 @@ type model struct {
 
 func newModel(sessions []Session, query string) model {
 	in := textinput.New()
-	in.Prompt = "> "
+	in.Prompt = "❯ "
+	st := textinput.DefaultDarkStyles()
+	st.Focused.Prompt = lipgloss.NewStyle().Foreground(matchColor)
+	in.SetStyles(st)
 	in.Placeholder = "search sessions"
 	in.SetValue(query)
 	in.Focus()
@@ -100,7 +108,7 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.WindowSizeMsg:
 		m.width, m.height = msg.Width, msg.Height
-		m.input.SetWidth(msg.Width - 3)
+		m.input.SetWidth(msg.Width - 5) // border 2, prompt 2, cursor 1
 		return m, nil
 	case tea.KeyPressMsg:
 		switch msg.String() {
@@ -142,18 +150,21 @@ func (m *model) move(d int) {
 	}
 }
 
-// listHeight is the screen height minus the two info lines and the input line.
-func (m model) listHeight() int { return max(1, m.height-3) }
+// listHeight is the screen height minus the two info lines and the 3-line input box.
+func (m model) listHeight() int { return max(1, m.height-5) }
 
 func (m model) View() tea.View {
 	var b strings.Builder
-	b.WriteString(dimStyle.Render(fmt.Sprintf("%d/%d  enter: resume  ↑↓/ctrl+p,n: move  esc: quit", len(m.matches), len(m.sessions))) + "\n")
+	key := func(k, desc string) string { return keyStyle.Render(k) + " " + dimStyle.Render(desc) }
+	help := strings.Join([]string{key("enter", "resume"), key("↑↓/ctrl+p,n", "move"), key("esc", "quit"),
+		dimStyle.Render(fmt.Sprintf("%d/%d", len(m.matches), len(m.sessions)))}, "  ")
+	b.WriteString(ansi.Truncate(help, m.width, "…") + "\n")
 	detail := ""
 	if len(m.matches) > 0 {
 		s := m.sessions[m.matches[m.cursor].idx]
-		detail = s.CWD + "  " + s.ID
+		detail = lipgloss.NewStyle().Foreground(projectColor).Render(s.CWD) + "  " + dimStyle.Render(s.ID)
 	}
-	b.WriteString(dimStyle.Render(ansi.Truncate(detail, m.width, "…")) + "\n")
+	b.WriteString(ansi.Truncate(detail, m.width, "…") + "\n")
 
 	// Best match (index 0) sits on the bottom row, just above the input like fzf.
 	rows := m.listHeight()
@@ -162,32 +173,32 @@ func (m model) View() tea.View {
 			b.WriteString("\n")
 			continue
 		}
-		base := lipgloss.NewStyle()
-		if i == m.cursor {
-			base = selectedStyle
-		}
-		b.WriteString(m.row(m.matches[i], base) + "\n")
+		b.WriteString(m.row(m.matches[i], i == m.cursor) + "\n")
 	}
-	b.WriteString(m.input.View())
+	b.WriteString(inputBox.Width(m.width).Render(m.input.View()))
 
 	v := tea.NewView(b.String())
 	v.AltScreen = true
 	return v
 }
 
-// row renders one list line in base style, with fuzzy-matched characters in
-// matchColor. Each segment is styled separately so the selection's reverse
-// video is not cut off by a highlight's reset sequence.
-func (m model) row(mt match, base lipgloss.Style) string {
+// row renders one list line with per-column colors and fuzzy-matched
+// characters in matchColor. Each segment is styled separately so the
+// selection background is not cut off by a highlight's reset sequence.
+func (m model) row(mt match, selected bool) string {
 	s := m.sessions[mt.idx]
-	hl := base.Foreground(matchColor)
+	base, marker := lipgloss.NewStyle(), " "
+	if selected {
+		base, marker = base.Background(selectedBg), "▌"
+	}
+	hl := base.Foreground(matchColor).Bold(true)
 	date := s.Updated.Local().Format("01-02 15:04")
 	proj := project(s.CWD)
 	sep := base.Render("  ")
-	titleW := max(0, m.width-len(date)-20-16-3*len("  "))
-	line := base.Render(date) + sep +
-		mark(proj, 20, mt.pos, len(s.Title)+1, base, hl) + sep +
-		mark(s.Branch, 16, mt.pos, len(s.Title)+1+len(proj)+1, base, hl) + sep +
+	titleW := max(0, m.width-1-len(date)-20-16-3*len("  "))
+	line := base.Foreground(matchColor).Render(marker) + base.Foreground(dateColor).Render(date) + sep +
+		mark(proj, 20, mt.pos, len(s.Title)+1, base.Foreground(projectColor), hl) + sep +
+		mark(s.Branch, 16, mt.pos, len(s.Title)+1+len(proj)+1, base.Foreground(branchColor), hl) + sep +
 		mark(s.Title, titleW, mt.pos, 0, base, hl)
 	return ansi.Truncate(line, m.width, "")
 }

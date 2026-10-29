@@ -86,8 +86,10 @@ Built with [Bubble Tea v2](https://charm.land/bubbletea), Bubbles v2
 <matches>/<total>  enter: resume  ↑↓/ctrl+p,n: move  esc: quit
 <cwd>  <session-id>                      (selected session)
 ...
-MM-DD HH:MM  project               branch            title   (best match / newest)
-> search box
+▌MM-DD HH:MM  project               branch            title   (best match / newest)
+╭──────────────────────────────────────────────╮
+│❯ search box                                  │
+╰──────────────────────────────────────────────╯
 ```
 
 | Key                 | Action                         |
@@ -102,8 +104,10 @@ The list is drawn bottom-up like fzf: the best match (or the newest session
 for an empty query) is on the bottom row and selected first.
 
 Columns are truncated and padded by display width, so CJK titles align.
-Characters matched by the fuzzy search (title, project, branch) are shown in
-orange (ANSI 208). Body-only matches are not highlighted.
+Colors (ANSI 256): accent and fuzzy-matched characters 208 (orange, matches
+bold), date 245, project 39, branch 170, selected row background 236 with a
+`▌` marker. Body-only matches are not highlighted. The palette assumes a dark
+terminal background.
 
 ## Resume
 

@@ -61,11 +61,11 @@ func TestFilter(t *testing.T) {
 func TestRowHighlight(t *testing.T) {
 	m := model{sessions: []Session{{Title: "login fix", CWD: "/w/holo", Branch: "main"}}, width: 80}
 	mt := filter(m.sessions, "holo")[0]
-	line := m.row(mt, lipgloss.NewStyle())
+	line := m.row(mt, false)
 	if got := ansi.StringWidth(line); got != 80 {
 		t.Errorf("width: %d", got)
 	}
-	hl := lipgloss.NewStyle().Foreground(matchColor).Render("holo")
+	hl := lipgloss.NewStyle().Foreground(matchColor).Bold(true).Render("holo")
 	if !strings.Contains(line, hl) {
 		t.Errorf("project not highlighted: %q", line)
 	}

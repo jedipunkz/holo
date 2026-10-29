@@ -1,10 +1,13 @@
-.PHONY: build test install update dev-install
+.PHONY: build test perf install update dev-install
 
 build:
 	go build -o holo .
 
 test:
 	go test -race ./...
+
+perf:
+	go test -run '^$$' -bench . -benchmem ./...
 
 install:
 	go install .

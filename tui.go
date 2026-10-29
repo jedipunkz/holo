@@ -112,11 +112,12 @@ func (m model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 				m.chosen = &s
 			}
 			return m, tea.Quit
+		// The list is drawn bottom-up, so moving up goes to the next match.
 		case "up", "ctrl+p":
-			m.move(-1)
+			m.move(1)
 			return m, nil
 		case "down", "ctrl+n":
-			m.move(1)
+			m.move(-1)
 			return m, nil
 		}
 	}
@@ -146,16 +147,18 @@ func (m model) listHeight() int { return max(1, m.height-3) }
 
 func (m model) View() tea.View {
 	var b strings.Builder
+	// Best match (index 0) sits on the bottom row, just above the input like fzf.
 	rows := m.listHeight()
-	for i := m.offset; i < min(len(m.matches), m.offset+rows); i++ {
+	for i := m.offset + rows - 1; i >= m.offset; i-- {
+		if i >= len(m.matches) {
+			b.WriteString("\n")
+			continue
+		}
 		base := lipgloss.NewStyle()
 		if i == m.cursor {
 			base = selectedStyle
 		}
 		b.WriteString(m.row(m.matches[i], base) + "\n")
-	}
-	for i := len(m.matches) - m.offset; i < rows; i++ {
-		b.WriteString("\n")
 	}
 
 	detail := ""

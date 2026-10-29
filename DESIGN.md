@@ -83,8 +83,8 @@ Built with [Bubble Tea v2](https://charm.land/bubbletea), Bubbles v2
 `textinput`, and Lip Gloss v2. Runs in the alternate screen.
 
 ```
-MM-DD HH:MM  project               branch            title
 ...
+MM-DD HH:MM  project               branch            title   (best match / newest)
 <cwd>  <session-id>                      (selected session)
 <matches>/<total>  enter: resume  ↑↓/ctrl+p,n: move  esc: quit
 > search box
@@ -92,11 +92,14 @@ MM-DD HH:MM  project               branch            title
 
 | Key                 | Action                         |
 |---------------------|--------------------------------|
-| typing              | refilter, cursor back to top   |
-| `↑` / `ctrl+p`      | move up                        |
-| `↓` / `ctrl+n`      | move down                      |
+| typing              | refilter, cursor back to bottom |
+| `↑` / `ctrl+p`      | move up (next match)           |
+| `↓` / `ctrl+n`      | move down (previous match)     |
 | `enter`             | resume the selected session    |
 | `esc` / `ctrl+c`    | quit                           |
+
+The list is drawn bottom-up like fzf: the best match (or the newest session
+for an empty query) is on the bottom row and selected first.
 
 Columns are truncated and padded by display width, so CJK titles align.
 Characters matched by the fuzzy search (title, project, branch) are shown in

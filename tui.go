@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"time"
 	"unicode/utf8"
 
 	"charm.land/bubbles/v2/textinput"
@@ -20,6 +21,7 @@ var (
 	dateColor    = lipgloss.Color("#928374") // gray
 	projectColor = lipgloss.Color("#83a598") // blue
 	branchColor  = lipgloss.Color("#d3869b") // purple
+	agoColor     = lipgloss.Color("#fabd2f") // yellow
 	titleColor   = lipgloss.Color("#ebdbb2") // fg
 	selectedBg   = lipgloss.Color("#3c3836") // bg1
 	dimStyle     = lipgloss.NewStyle().Foreground(dateColor)
@@ -204,14 +206,34 @@ func (m model) row(mt match, selected bool) string {
 	}
 	hl := base.Foreground(matchColor).Bold(true)
 	date := s.Updated.Local().Format("01-02 15:04")
+	rel := fmt.Sprintf("%8s", ago(time.Since(s.Updated)))
 	proj := project(s.CWD)
 	sep := base.Render("  ")
-	titleW := max(0, m.width-1-len(date)-20-16-3*len("  "))
-	line := base.Foreground(matchColor).Render(marker) + base.Foreground(dateColor).Render(date) + sep +
+	titleW := max(0, m.width-1-len(date)-1-len(rel)-20-16-3*len("  "))
+	line := base.Foreground(matchColor).Render(marker) + base.Foreground(dateColor).Render(date) +
+		base.Render(" ") + base.Foreground(agoColor).Render(rel) + sep +
 		mark(proj, 20, mt.pos, len(s.Title)+1, base.Foreground(projectColor), hl) + sep +
 		mark(s.Branch, 16, mt.pos, len(s.Title)+1+len(proj)+1, base.Foreground(branchColor), hl) + sep +
 		mark(s.Title, titleW, mt.pos, 0, base.Foreground(titleColor), hl)
 	return ansi.Truncate(line, m.width, "")
+}
+
+// ago formats d coarsely, e.g. "5m ago" (at most 8 columns).
+func ago(d time.Duration) string {
+	switch day := 24 * time.Hour; {
+	case d < time.Minute:
+		return "now"
+	case d < time.Hour:
+		return fmt.Sprintf("%dm ago", int(d/time.Minute))
+	case d < day:
+		return fmt.Sprintf("%dh ago", int(d/time.Hour))
+	case d < 30*day:
+		return fmt.Sprintf("%dd ago", int(d/day))
+	case d < 365*day:
+		return fmt.Sprintf("%dmo ago", int(d/(30*day)))
+	default:
+		return fmt.Sprintf("%dy ago", int(d/(365*day)))
+	}
 }
 
 // mark truncates or right-pads text to display width w (CJK-aware), rendering bytes whose

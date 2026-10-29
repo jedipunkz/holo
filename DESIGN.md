@@ -89,7 +89,7 @@ Built with [Bubble Tea v2](https://charm.land/bubbletea), Bubbles v2
 │<cwd>  <session-id>          <matches>/<total>│   (selected session)
 ╰──────────────────────────────────────────────╯
 ...
-▌MM-DD HH:MM  project               branch            title   (best match / newest)
+▌MM-DD HH:MM   3h ago  project               branch            title   (best match / newest)
 ╭──────────────────────────────────────────────╮
 │❯ search box                                  │
 ╰──────────────────────────────────────────────╯
@@ -108,7 +108,7 @@ for an empty query) is on the bottom row and selected first.
 
 Columns are truncated and padded by display width, so CJK titles align.
 Colors follow the gruvbox dark palette: accent and fuzzy-matched characters
-orange `#fe8019` (matches bold), date and dim text gray `#928374`, project blue
+orange `#fe8019` (matches bold), date and dim text gray `#928374`, relative time yellow `#fabd2f`, project blue
 `#83a598`, branch purple `#d3869b`, title fg `#ebdbb2`, selected row background
 bg1 `#3c3836` with a `▌` marker. Body-only matches are not highlighted. The palette assumes a dark
 terminal background.

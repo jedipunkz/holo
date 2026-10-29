@@ -3,6 +3,7 @@ package main
 import (
 	"strings"
 	"testing"
+	"time"
 
 	"charm.land/lipgloss/v2"
 	"github.com/charmbracelet/x/ansi"
@@ -59,6 +60,21 @@ func TestFilter(t *testing.T) {
 	}
 	if got := filter(sessions, "2261FAAE"); len(got) != 2 || got[0].idx != 2 || got[1].idx != 3 {
 		t.Errorf("id prefix before body: %v", got)
+	}
+}
+
+func TestAgo(t *testing.T) {
+	for d, want := range map[time.Duration]string{
+		30 * time.Second:     "now",
+		59 * time.Minute:     "59m ago",
+		23 * time.Hour:       "23h ago",
+		29 * 24 * time.Hour:  "29d ago",
+		364 * 24 * time.Hour: "12mo ago",
+		800 * 24 * time.Hour: "2y ago",
+	} {
+		if got := ago(d); got != want {
+			t.Errorf("ago(%v) = %q, want %q", d, got, want)
+		}
 	}
 }
 

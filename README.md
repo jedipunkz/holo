@@ -35,6 +35,23 @@ holo ls            # print sessions as TSV: updated, id, cwd, title
 holo ls --json     # print sessions as JSON
 ```
 
+To open holo with `ctrl+q` in fish, add to `~/.config/fish/config.fish`:
+
+```fish
+if type -q holo
+    holo shell fish | source
+end
+```
+
+For zsh, add to `~/.zshrc` (this also runs `unsetopt flow_control`, so the
+terminal passes `ctrl+q` through):
+
+```zsh
+if command -v holo >/dev/null; then
+  eval "$(holo shell zsh)"
+fi
+```
+
 | Key              | Action                      |
 |------------------|-----------------------------|
 | typing           | filter sessions             |

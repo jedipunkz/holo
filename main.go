@@ -14,8 +14,40 @@ import (
 )
 
 const usage = `usage:
-  holo [query]     search sessions in a TUI and resume the selected one
-  holo ls [--json] print sessions (TSV: updated, id, cwd, title)`
+  holo [query]         search sessions in a TUI and resume the selected one
+  holo ls [--json]     print sessions (TSV: updated, id, cwd, title)
+  holo shell fish|zsh  print key bindings (Ctrl-Q opens holo)`
+
+// shellInit holds the key bindings per shell. holo runs claude in place of
+// itself, so the binding returns to the prompt once claude exits.
+var shellInit = map[string]string{
+	"fish": `# holo: Ctrl-Q opens holo. Add to ~/.config/fish/config.fish:
+#   holo shell fish | source
+function __holo_open
+    holo
+    commandline -f repaint
+end
+bind \cq __holo_open
+if bind -M insert >/dev/null 2>&1
+    bind -M insert \cq __holo_open
+end
+`,
+	// zsh runs holo as an ordinary command line, which hands it the terminal;
+	// push-input restores what was typed afterwards. flow_control is unset
+	// because the tty otherwise consumes Ctrl-Q as XON before zle sees it.
+	"zsh": `# holo: Ctrl-Q opens holo. Add to ~/.zshrc:
+#   eval "$(holo shell zsh)"
+unsetopt flow_control
+__holo_open() {
+  zle push-input
+  BUFFER=holo
+  zle accept-line
+}
+zle -N __holo_open
+bindkey -M emacs '^Q' __holo_open
+bindkey -M viins '^Q' __holo_open
+`,
+}
 
 func main() {
 	if err := run(os.Args[1:]); err != nil {
@@ -27,6 +59,10 @@ func main() {
 func run(args []string) error {
 	if len(args) > 0 && (args[0] == "-h" || args[0] == "--help") {
 		fmt.Println(usage)
+		return nil
+	}
+	if len(args) == 2 && args[0] == "shell" && shellInit[args[1]] != "" {
+		fmt.Print(shellInit[args[1]])
 		return nil
 	}
 

@@ -127,6 +127,15 @@ func TestRunHelp(t *testing.T) {
 	}
 }
 
+func TestRunShell(t *testing.T) {
+	for _, sh := range []string{"fish", "zsh"} {
+		out, err := captureStdout(t, func() error { return run([]string{"shell", sh}) })
+		if err != nil || out != shellInit[sh] {
+			t.Errorf("%s: %q, %v", sh, out, err)
+		}
+	}
+}
+
 func TestRunLs(t *testing.T) {
 	cfg := t.TempDir()
 	t.Setenv("CLAUDE_CONFIG_DIR", cfg)

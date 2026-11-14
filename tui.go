@@ -173,13 +173,7 @@ func (m model) previewHeight() int {
 	if m.height < 7+minPreviewBoxHeight {
 		return 0
 	}
-	height := min(maxPreviewBoxHeight, max(minPreviewBoxHeight, m.height/3))
-	count := 1
-	if len(m.matches) > 0 {
-		s := m.sessions[m.matches[m.cursor].idx]
-		count = max(1, len(s.preview))
-	}
-	return min(height, max(minPreviewBoxHeight, count+2))
+	return min(maxPreviewBoxHeight, max(minPreviewBoxHeight, m.height/3))
 }
 
 // listHeight leaves room for the detail, preview, and input boxes.

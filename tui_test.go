@@ -383,7 +383,7 @@ func TestMoveScrolls(t *testing.T) {
 }
 
 func TestListHeight(t *testing.T) {
-	for h, want := range map[int]int{0: 1, 6: 1, 7: 1, 8: 2, 10: 4, 11: 1, 12: 2, 14: 4, 16: 6, 24: 14, 30: 20} {
+	for h, want := range map[int]int{0: 1, 6: 1, 7: 1, 8: 2, 10: 4, 11: 1, 12: 2, 14: 4, 16: 5, 24: 10, 30: 14} {
 		if got := (model{height: h}).listHeight(); got != want {
 			t.Errorf("height %d: %d, want %d", h, got, want)
 		}
@@ -398,6 +398,22 @@ func TestPreviewHeightFitsTerminal(t *testing.T) {
 		if got := m.previewHeight(); got != want {
 			t.Errorf("height %d: preview height %d, want %d", h, got, want)
 		}
+	}
+}
+
+func TestPreviewHeightDoesNotChangeWithSelection(t *testing.T) {
+	sessions := testSessions(2)
+	sessions[0].preview = sessions[0].preview[:1]
+	sessions[1].preview = make([]previewMessage, maxPreviewMessages)
+	m, _ := update(t, newModel(sessions, ""), tea.WindowSizeMsg{Width: 100, Height: 24})
+	previewHeight, listHeight := m.previewHeight(), m.listHeight()
+
+	m, _ = update(t, m, key(tea.KeyUp, 0))
+	if got := m.previewHeight(); got != previewHeight {
+		t.Errorf("preview height changed from %d to %d after selection move", previewHeight, got)
+	}
+	if got := m.listHeight(); got != listHeight {
+		t.Errorf("list height changed from %d to %d after selection move", listHeight, got)
 	}
 }
 
@@ -502,28 +518,28 @@ func TestView(t *testing.T) {
 		t.Errorf("count should be right-aligned: %q", lines[1])
 	}
 
-	// List (lines 3-8): blank rows on top, best match on the bottom.
-	for _, i := range []int{3, 4, 5, 6} {
+	// List (lines 3-7): blank rows on top, best match on the bottom.
+	for _, i := range []int{3, 4, 5} {
 		if lines[i] != "" {
 			t.Errorf("unused row %d should be blank: %q", i, lines[i])
 		}
 	}
-	if !strings.Contains(lines[7], "session 1") || strings.HasPrefix(lines[7], "▌") {
-		t.Errorf("second match row: %q", lines[7])
+	if !strings.Contains(lines[6], "session 1") || strings.HasPrefix(lines[6], "▌") {
+		t.Errorf("second match row: %q", lines[6])
 	}
-	if !strings.Contains(lines[8], "session 0") || !strings.HasPrefix(lines[8], "▌") {
-		t.Errorf("best match should be on the bottom row and selected: %q", lines[8])
-	}
-
-	// Input box (lines 9-11) follows the list.
-	if !strings.HasPrefix(lines[9], "╭") || !strings.Contains(lines[10], "❯") || !strings.HasPrefix(lines[11], "╰") {
-		t.Errorf("input box: %q / %q / %q", lines[9], lines[10], lines[11])
+	if !strings.Contains(lines[7], "session 0") || !strings.HasPrefix(lines[7], "▌") {
+		t.Errorf("best match should be on the bottom row and selected: %q", lines[7])
 	}
 
-	// Preview (lines 12-15) shows one flattened line per role.
-	if !strings.HasPrefix(lines[12], "╭") || !strings.Contains(lines[13], "you: user prompt 0") ||
-		!strings.Contains(lines[14], "claude: assistant reply 0") || !strings.HasPrefix(lines[15], "╰") {
-		t.Errorf("preview box: %q / %q / %q / %q", lines[12], lines[13], lines[14], lines[15])
+	// Input box (lines 8-10) follows the list.
+	if !strings.HasPrefix(lines[8], "╭") || !strings.Contains(lines[9], "❯") || !strings.HasPrefix(lines[10], "╰") {
+		t.Errorf("input box: %q / %q / %q", lines[8], lines[9], lines[10])
+	}
+
+	// Preview (lines 11-15) shows one flattened line per role.
+	if !strings.HasPrefix(lines[11], "╭") || !strings.Contains(lines[12], "you: user prompt 0") ||
+		!strings.Contains(lines[13], "claude: assistant reply 0") || !strings.HasPrefix(lines[15], "╰") {
+		t.Errorf("preview box: %q / %q / %q / %q / %q", lines[11], lines[12], lines[13], lines[14], lines[15])
 	}
 }
 
@@ -534,11 +550,11 @@ func TestViewFollowsCursor(t *testing.T) {
 	if !strings.Contains(lines[1], "id-1") {
 		t.Errorf("detail should follow the cursor: %q", lines[1])
 	}
-	if !strings.HasPrefix(lines[7], "▌") || strings.HasPrefix(lines[8], "▌") {
-		t.Errorf("selection marker should move up: %q / %q", lines[7], lines[8])
+	if !strings.HasPrefix(lines[6], "▌") || strings.HasPrefix(lines[7], "▌") {
+		t.Errorf("selection marker should move up: %q / %q", lines[6], lines[7])
 	}
-	if !strings.Contains(lines[13], "you: user prompt 1") || !strings.Contains(lines[14], "claude: assistant reply 1") {
-		t.Errorf("preview should follow the cursor: %q / %q", lines[13], lines[14])
+	if !strings.Contains(lines[12], "you: user prompt 1") || !strings.Contains(lines[13], "claude: assistant reply 1") {
+		t.Errorf("preview should follow the cursor: %q / %q", lines[12], lines[13])
 	}
 }
 
@@ -555,8 +571,8 @@ func TestViewPreviewUsesFullWidthForSingleLineMessages(t *testing.T) {
 	}
 
 	start := 3 + m.listHeight() + 3
-	if !strings.HasPrefix(lines[start], "╭") || !strings.HasPrefix(lines[start+3], "╰") {
-		t.Fatalf("preview box should occupy 4 rows at height 30: %q / %q", lines[start], lines[start+3])
+	if !strings.HasPrefix(lines[start], "╭") || !strings.HasPrefix(lines[start+9], "╰") {
+		t.Fatalf("preview box should occupy 10 rows at height 30: %q / %q", lines[start], lines[start+9])
 	}
 	for _, i := range []int{start + 1, start + 2} {
 		if ansi.StringWidth(lines[i]) != 40 {

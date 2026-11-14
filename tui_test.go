@@ -254,7 +254,7 @@ func TestRow(t *testing.T) {
 		if !strings.HasPrefix(ansi.Strip(line), "▌") {
 			t.Errorf("no marker: %q", ansi.Strip(line))
 		}
-		if !strings.Contains(line, "48;2;60;56;54") { // #3c3836 as a truecolor background
+		if !strings.Contains(line, "48;2;41;46;66") { // #292e42 as a truecolor background
 			t.Errorf("no selection background in %q", line)
 		}
 	})

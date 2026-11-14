@@ -107,10 +107,10 @@ The list is drawn bottom-up like fzf: the best match (or the newest session
 for an empty query) is on the bottom row and selected first.
 
 Columns are truncated and padded by display width, so CJK titles align.
-Colors follow the gruvbox dark palette: accent and fuzzy-matched characters
-orange `#fe8019` (matches bold), date and dim text gray `#928374`, relative time yellow `#fabd2f`, project blue
-`#83a598`, branch purple `#d3869b`, title fg `#ebdbb2`, selected row background
-bg1 `#3c3836` with a `▌` marker. Body-only matches are not highlighted. The palette assumes a dark
+Colors follow the TokyoNight dark palette: accent and fuzzy-matched characters
+blue `#7aa2f7` (matches bold), date and dim text comment `#565f89`, relative time yellow `#e0af68`, project cyan
+`#7dcfff`, branch purple `#bb9af7`, title fg `#c0caf5`, selected row background
+`#292e42` with a `▌` marker. Body-only matches are not highlighted. The palette assumes a dark
 terminal background.
 
 ## Resume

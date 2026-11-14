@@ -94,8 +94,8 @@ Built with [Bubble Tea v2](https://charm.land/bubbletea), Bubbles v2
 │❯ search box                                  │
 ╰──────────────────────────────────────────────╯
 ╭──────────────────────────────────────────────╮
-│you: <latest prompt>                          │
-│claude: <latest reply>                        │
+│you: <recent prompt>                          │
+│claude: <recent reply>                        │
 ╰──────────────────────────────────────────────╯
 ```
 
@@ -109,10 +109,10 @@ Built with [Bubble Tea v2](https://charm.land/bubbletea), Bubbles v2
 
 The list is drawn bottom-up like fzf: the best match (or the newest session
 for an empty query) is on the bottom row and selected first.
-The latest user prompt and Claude reply for the selected session appear below
-the search input as one line per role. Newlines and repeated whitespace are
-collapsed; messages use the full terminal width and truncate only when they
-exceed it.
+Up to eight recent user and Claude messages for the selected session appear
+below the search input in chronological order, one line per message. Newlines
+and repeated whitespace are collapsed; messages use the full terminal width
+and truncate only when they exceed it.
 
 Columns are truncated and padded by display width, so CJK titles align.
 Colors follow the TokyoNight dark palette: accent and fuzzy-matched characters

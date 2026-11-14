@@ -103,7 +103,10 @@ type model struct {
 	chosen   *Session
 }
 
-const previewBoxHeight = 4
+const (
+	minPreviewBoxHeight = 4
+	maxPreviewBoxHeight = 10
+)
 
 func newModel(sessions []Session, query string) model {
 	in := textinput.New()
@@ -167,10 +170,16 @@ func (m *model) move(d int) {
 
 // previewHeight reserves room for the preview when the terminal can fit it.
 func (m model) previewHeight() int {
-	if m.height < 7+previewBoxHeight {
+	if m.height < 7+minPreviewBoxHeight {
 		return 0
 	}
-	return previewBoxHeight
+	height := min(maxPreviewBoxHeight, max(minPreviewBoxHeight, m.height/3))
+	count := 1
+	if len(m.matches) > 0 {
+		s := m.sessions[m.matches[m.cursor].idx]
+		count = max(1, len(s.preview))
+	}
+	return min(height, max(minPreviewBoxHeight, count+2))
 }
 
 // listHeight leaves room for the detail, preview, and input boxes.
@@ -202,20 +211,30 @@ func (m model) View() tea.View {
 	b.WriteString(box.Width(m.width).Render(m.input.View()) + "\n")
 	if m.previewHeight() > 0 {
 		inner := max(0, m.width-2)
-		previewLinesContent := []string{
-			previewMessageLine("preview", "No session selected", inner, dimStyle),
-			"",
-		}
+		innerHeight := m.previewHeight() - 2
+		var previewLinesContent []string
 		if len(m.matches) > 0 {
 			s := m.sessions[m.matches[m.cursor].idx]
-			assistant := s.PreviewAssistant
-			if assistant == "" {
-				assistant = "(no response yet)"
+			messages := s.preview
+			if len(messages) > innerHeight {
+				messages = messages[len(messages)-innerHeight:]
 			}
-			previewLinesContent = []string{
-				previewMessageLine("you", s.PreviewUser, inner, lipgloss.NewStyle().Foreground(projectColor)),
-				previewMessageLine("claude", assistant, inner, lipgloss.NewStyle().Foreground(titleColor)),
+			for _, msg := range messages {
+				style := dimStyle
+				switch msg.role {
+				case "you":
+					style = lipgloss.NewStyle().Foreground(projectColor)
+				case "claude":
+					style = lipgloss.NewStyle().Foreground(titleColor)
+				}
+				previewLinesContent = append(previewLinesContent, previewMessageLine(msg.role, msg.text, inner, style))
 			}
+		}
+		if len(previewLinesContent) == 0 {
+			previewLinesContent = append(previewLinesContent, previewMessageLine("preview", "No conversation", inner, dimStyle))
+		}
+		for len(previewLinesContent) < innerHeight {
+			previewLinesContent = append(previewLinesContent, "")
 		}
 		b.WriteString(box.Width(m.width).Render(strings.Join(previewLinesContent, "\n")))
 	}

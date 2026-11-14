@@ -296,7 +296,10 @@ func testSessions(n int) []Session {
 	for i := range ss {
 		ss[i] = Session{
 			ID: fmt.Sprintf("id-%d", i), Title: fmt.Sprintf("session %d", i), CWD: fmt.Sprintf("/w/p%d", i),
-			PreviewUser: fmt.Sprintf("user prompt %d", i), PreviewAssistant: fmt.Sprintf("assistant reply %d", i),
+			preview: []previewMessage{
+				{role: "you", text: fmt.Sprintf("user prompt %d", i)},
+				{role: "claude", text: fmt.Sprintf("assistant reply %d", i)},
+			},
 		}
 	}
 	return ss
@@ -388,8 +391,11 @@ func TestListHeight(t *testing.T) {
 }
 
 func TestPreviewHeightFitsTerminal(t *testing.T) {
-	for h, want := range map[int]int{10: 0, 11: 4, 14: 4, 16: 4, 24: 4, 30: 4} {
-		if got := (model{height: h}).previewHeight(); got != want {
+	preview := make([]previewMessage, maxPreviewMessages)
+	matches := []match{{idx: 0}}
+	for h, want := range map[int]int{10: 0, 11: 4, 14: 4, 16: 5, 24: 8, 30: 10} {
+		m := model{height: h, sessions: []Session{{preview: preview}}, matches: matches}
+		if got := m.previewHeight(); got != want {
 			t.Errorf("height %d: preview height %d, want %d", h, got, want)
 		}
 	}
@@ -538,8 +544,10 @@ func TestViewFollowsCursor(t *testing.T) {
 
 func TestViewPreviewUsesFullWidthForSingleLineMessages(t *testing.T) {
 	sessions := testSessions(1)
-	sessions[0].PreviewUser = strings.Repeat("user words ", 20)
-	sessions[0].PreviewAssistant = strings.Repeat("assistant words ", 20)
+	sessions[0].preview = []previewMessage{
+		{role: "you", text: strings.Repeat("user words ", 20)},
+		{role: "claude", text: strings.Repeat("assistant words ", 20)},
+	}
 	m, _ := update(t, newModel(sessions, ""), tea.WindowSizeMsg{Width: 40, Height: 30})
 	lines := viewLines(m)
 	if len(lines) != 30 {
@@ -557,6 +565,34 @@ func TestViewPreviewUsesFullWidthForSingleLineMessages(t *testing.T) {
 	}
 	if !strings.Contains(lines[start+1], "you: user words") || !strings.Contains(lines[start+2], "claude: assistant words") {
 		t.Errorf("preview should show one line per role: %q / %q", lines[start+1], lines[start+2])
+	}
+}
+
+func TestViewShowsRecentMessages(t *testing.T) {
+	sessions := testSessions(1)
+	sessions[0].preview = nil
+	for i := range 6 {
+		sessions[0].preview = append(sessions[0].preview,
+			previewMessage{role: "you", text: fmt.Sprintf("prompt %d", i)},
+			previewMessage{role: "claude", text: fmt.Sprintf("reply %d", i)},
+		)
+	}
+	m, _ := update(t, newModel(sessions, ""), tea.WindowSizeMsg{Width: 100, Height: 30})
+	lines := viewLines(m)
+	start := 3 + m.listHeight() + 3
+	if m.previewHeight() != 10 {
+		t.Fatalf("preview height = %d, want 10", m.previewHeight())
+	}
+	want := []string{
+		"you: prompt 2", "claude: reply 2",
+		"you: prompt 3", "claude: reply 3",
+		"you: prompt 4", "claude: reply 4",
+		"you: prompt 5", "claude: reply 5",
+	}
+	for i, text := range want {
+		if !strings.Contains(lines[start+1+i], text) {
+			t.Errorf("preview row %d = %q, want %q", i, lines[start+1+i], text)
+		}
 	}
 }
 

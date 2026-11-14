@@ -13,6 +13,13 @@ import (
 	"time"
 )
 
+const maxPreviewMessages = 16
+
+type previewMessage struct {
+	role string
+	text string
+}
+
 // Session is one Claude Code session file (~/.claude/projects/<dir>/<id>.jsonl).
 type Session struct {
 	ID          string    `json:"id"`
@@ -22,6 +29,7 @@ type Session struct {
 	FirstPrompt string    `json:"firstPrompt"`
 	LastPrompt  string    `json:"lastPrompt"`
 	Updated     time.Time `json:"updated"`
+	preview     []previewMessage
 	// Body is the lowercased user/assistant text, used for full-text search.
 	Body string `json:"-"`
 }
@@ -135,10 +143,29 @@ func apply(s *Session, body *strings.Builder, rec record) {
 		}
 		body.WriteString(t)
 		body.WriteByte('\n')
-		// Slash commands and injected context start with a tag; skip them as a title.
-		if rec.Type == "user" && !rec.IsMeta && s.FirstPrompt == "" && !strings.HasPrefix(t, "<") {
-			s.FirstPrompt = oneLine(t)
+		if rec.Type == "user" {
+			// Slash commands and injected context start with a tag; skip them as a prompt.
+			if !rec.IsMeta && !strings.HasPrefix(t, "<") {
+				appendPreview(s, "you", t)
+				if s.FirstPrompt == "" {
+					s.FirstPrompt = oneLine(t)
+				}
+			}
+		} else if len(s.preview) > 0 {
+			appendPreview(s, "claude", t)
 		}
+	}
+}
+
+func appendPreview(s *Session, role, text string) {
+	if role == "claude" && len(s.preview) > 0 && s.preview[len(s.preview)-1].role == role {
+		last := &s.preview[len(s.preview)-1]
+		last.text += "\n" + text
+	} else {
+		s.preview = append(s.preview, previewMessage{role: role, text: text})
+	}
+	if len(s.preview) > maxPreviewMessages {
+		s.preview = append([]previewMessage(nil), s.preview[len(s.preview)-maxPreviewMessages:]...)
 	}
 }
 

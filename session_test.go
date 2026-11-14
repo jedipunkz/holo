@@ -2,6 +2,7 @@ package main
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
@@ -36,6 +37,50 @@ func TestParse(t *testing.T) {
 	withTitle := parse(strings.NewReader(sample + "\n" + `{"type":"ai-title","aiTitle":"Login fix"}`))
 	if withTitle.Title != "Login fix" {
 		t.Errorf("ai-title: %q", withTitle.Title)
+	}
+}
+
+func TestParsePreviewUsesLastUserAndAssistantMessages(t *testing.T) {
+	input := `{"type":"user","message":{"content":"first prompt"}}
+{"type":"assistant","message":{"content":"first reply"}}
+{"type":"user","message":{"content":"latest prompt"}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Bash"},{"type":"text","text":"latest reply"}]}}
+{"type":"user","isMeta":true,"message":{"content":"hidden context"}}
+{"type":"user","message":{"content":"<command-name>/clear</command-name>"}}`
+
+	s := parse(strings.NewReader(input))
+	want := []previewMessage{
+		{role: "you", text: "first prompt"},
+		{role: "claude", text: "first reply"},
+		{role: "you", text: "latest prompt"},
+		{role: "claude", text: "latest reply"},
+	}
+	if len(s.preview) != len(want) {
+		t.Fatalf("preview has %d messages, want %d: %+v", len(s.preview), len(want), s.preview)
+	}
+	for i := range want {
+		if s.preview[i] != want[i] {
+			t.Errorf("preview[%d] = %+v, want %+v", i, s.preview[i], want[i])
+		}
+	}
+}
+
+func TestParsePreviewKeepsOnlyRecentMessages(t *testing.T) {
+	var input strings.Builder
+	for i := range maxPreviewMessages/2 + 4 {
+		fmt.Fprintf(&input, `{"type":"user","message":{"content":"prompt %d"}}`+"\n", i)
+		fmt.Fprintf(&input, `{"type":"assistant","message":{"content":"reply %d"}}`+"\n", i)
+	}
+
+	s := parse(strings.NewReader(input.String()))
+	if len(s.preview) != maxPreviewMessages {
+		t.Fatalf("preview has %d messages, want %d", len(s.preview), maxPreviewMessages)
+	}
+	if got := s.preview[0]; got.role != "you" || got.text != "prompt 4" {
+		t.Errorf("oldest retained message = %+v", got)
+	}
+	if got := s.preview[len(s.preview)-1]; got.role != "claude" || got.text != "reply 11" {
+		t.Errorf("newest retained message = %+v", got)
 	}
 }
 

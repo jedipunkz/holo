@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"charm.land/bubbles/v2/textinput"
@@ -102,6 +103,11 @@ type model struct {
 	chosen   *Session
 }
 
+const (
+	minPreviewBoxHeight = 4
+	maxPreviewBoxHeight = 10
+)
+
 func newModel(sessions []Session, query string) model {
 	in := textinput.New()
 	in.Prompt = "❯ "
@@ -162,8 +168,16 @@ func (m *model) move(d int) {
 	}
 }
 
-// listHeight is the screen height minus the 3-line detail and input boxes.
-func (m model) listHeight() int { return max(1, m.height-6) }
+// previewHeight reserves room for the preview when the terminal can fit it.
+func (m model) previewHeight() int {
+	if m.height < 7+minPreviewBoxHeight {
+		return 0
+	}
+	return min(maxPreviewBoxHeight, max(minPreviewBoxHeight, m.height/3))
+}
+
+// listHeight leaves room for the detail, preview, and input boxes.
+func (m model) listHeight() int { return max(1, m.height-6-m.previewHeight()) }
 
 func (m model) View() tea.View {
 	var b strings.Builder
@@ -188,7 +202,36 @@ func (m model) View() tea.View {
 		}
 		b.WriteString(m.row(m.matches[i], i == m.cursor) + "\n")
 	}
-	b.WriteString(box.Width(m.width).Render(m.input.View()))
+	b.WriteString(box.Width(m.width).Render(m.input.View()) + "\n")
+	if m.previewHeight() > 0 {
+		inner := max(0, m.width-2)
+		innerHeight := m.previewHeight() - 2
+		var previewLinesContent []string
+		if len(m.matches) > 0 {
+			s := m.sessions[m.matches[m.cursor].idx]
+			messages := s.preview
+			if len(messages) > innerHeight {
+				messages = messages[len(messages)-innerHeight:]
+			}
+			for _, msg := range messages {
+				style := dimStyle
+				switch msg.role {
+				case "you":
+					style = lipgloss.NewStyle().Foreground(projectColor)
+				case "claude":
+					style = lipgloss.NewStyle().Foreground(titleColor)
+				}
+				previewLinesContent = append(previewLinesContent, previewMessageLine(msg.role, msg.text, inner, style))
+			}
+		}
+		if len(previewLinesContent) == 0 {
+			previewLinesContent = append(previewLinesContent, previewMessageLine("preview", "No conversation", inner, dimStyle))
+		}
+		for len(previewLinesContent) < innerHeight {
+			previewLinesContent = append(previewLinesContent, "")
+		}
+		b.WriteString(box.Width(m.width).Render(strings.Join(previewLinesContent, "\n")))
+	}
 
 	v := tea.NewView(b.String())
 	v.AltScreen = true
@@ -216,6 +259,26 @@ func (m model) row(mt match, selected bool) string {
 		mark(s.Branch, 16, mt.pos, len(s.Title)+1+len(proj)+1, base.Foreground(branchColor), hl) + sep +
 		mark(s.Title, titleW, mt.pos, 0, base.Foreground(titleColor), hl)
 	return ansi.Truncate(line, m.width, "")
+}
+
+func previewMessageLine(label, text string, width int, style lipgloss.Style) string {
+	text = ansi.Strip(text)
+	text = strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) {
+			return ' '
+		}
+		return r
+	}, text)
+	text = oneLine(text)
+	if text == "" {
+		text = "(empty)"
+	}
+	prefix := strings.ToLower(label) + ": "
+	line := ansi.Truncate(prefix+text, max(0, width), "…")
+	if strings.HasPrefix(line, prefix) {
+		return style.Bold(true).Render(prefix) + style.Render(line[len(prefix):])
+	}
+	return style.Bold(true).Render(line)
 }
 
 // ago formats d coarsely, e.g. "5m ago" (at most 8 columns).

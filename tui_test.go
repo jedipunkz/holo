@@ -294,7 +294,13 @@ func isQuit(cmd tea.Cmd) bool {
 func testSessions(n int) []Session {
 	ss := make([]Session, n)
 	for i := range ss {
-		ss[i] = Session{ID: fmt.Sprintf("id-%d", i), Title: fmt.Sprintf("session %d", i), CWD: fmt.Sprintf("/w/p%d", i)}
+		ss[i] = Session{
+			ID: fmt.Sprintf("id-%d", i), Title: fmt.Sprintf("session %d", i), CWD: fmt.Sprintf("/w/p%d", i),
+			preview: []previewMessage{
+				{role: "you", text: fmt.Sprintf("user prompt %d", i)},
+				{role: "claude", text: fmt.Sprintf("assistant reply %d", i)},
+			},
+		}
 	}
 	return ss
 }
@@ -377,10 +383,37 @@ func TestMoveScrolls(t *testing.T) {
 }
 
 func TestListHeight(t *testing.T) {
-	for h, want := range map[int]int{0: 1, 6: 1, 7: 1, 8: 2, 30: 24} {
+	for h, want := range map[int]int{0: 1, 6: 1, 7: 1, 8: 2, 10: 4, 11: 1, 12: 2, 14: 4, 16: 5, 24: 10, 30: 14} {
 		if got := (model{height: h}).listHeight(); got != want {
 			t.Errorf("height %d: %d, want %d", h, got, want)
 		}
+	}
+}
+
+func TestPreviewHeightFitsTerminal(t *testing.T) {
+	preview := make([]previewMessage, maxPreviewMessages)
+	matches := []match{{idx: 0}}
+	for h, want := range map[int]int{10: 0, 11: 4, 14: 4, 16: 5, 24: 8, 30: 10} {
+		m := model{height: h, sessions: []Session{{preview: preview}}, matches: matches}
+		if got := m.previewHeight(); got != want {
+			t.Errorf("height %d: preview height %d, want %d", h, got, want)
+		}
+	}
+}
+
+func TestPreviewHeightDoesNotChangeWithSelection(t *testing.T) {
+	sessions := testSessions(2)
+	sessions[0].preview = sessions[0].preview[:1]
+	sessions[1].preview = make([]previewMessage, maxPreviewMessages)
+	m, _ := update(t, newModel(sessions, ""), tea.WindowSizeMsg{Width: 100, Height: 24})
+	previewHeight, listHeight := m.previewHeight(), m.listHeight()
+
+	m, _ = update(t, m, key(tea.KeyUp, 0))
+	if got := m.previewHeight(); got != previewHeight {
+		t.Errorf("preview height changed from %d to %d after selection move", previewHeight, got)
+	}
+	if got := m.listHeight(); got != listHeight {
+		t.Errorf("list height changed from %d to %d after selection move", listHeight, got)
 	}
 }
 
@@ -456,15 +489,15 @@ func viewLines(m model) []string {
 
 func TestView(t *testing.T) {
 	ss := testSessions(2)
-	m, _ := update(t, newModel(ss, ""), tea.WindowSizeMsg{Width: 100, Height: 10})
+	m, _ := update(t, newModel(ss, ""), tea.WindowSizeMsg{Width: 100, Height: 16})
 	v := m.View()
 	if !v.AltScreen {
 		t.Error("AltScreen should be on")
 	}
 
 	lines := viewLines(m)
-	if len(lines) != 10 {
-		t.Fatalf("want 10 lines, got %d:\n%s", len(lines), strings.Join(lines, "\n"))
+	if len(lines) != 16 {
+		t.Fatalf("want 16 lines, got %d:\n%s", len(lines), strings.Join(lines, "\n"))
 	}
 	for i, l := range strings.Split(v.Content, "\n") {
 		if w := ansi.StringWidth(l); w > 100 {
@@ -485,32 +518,112 @@ func TestView(t *testing.T) {
 		t.Errorf("count should be right-aligned: %q", lines[1])
 	}
 
-	// List (lines 3-6): blank rows on top, best match on the bottom row.
-	if lines[3] != "" || lines[4] != "" {
-		t.Errorf("unused rows should be blank and on top: %q %q", lines[3], lines[4])
+	// List (lines 3-7): blank rows on top, best match on the bottom.
+	for _, i := range []int{3, 4, 5} {
+		if lines[i] != "" {
+			t.Errorf("unused row %d should be blank: %q", i, lines[i])
+		}
 	}
-	if !strings.Contains(lines[5], "session 1") || strings.HasPrefix(lines[5], "▌") {
-		t.Errorf("second match row: %q", lines[5])
+	if !strings.Contains(lines[6], "session 1") || strings.HasPrefix(lines[6], "▌") {
+		t.Errorf("second match row: %q", lines[6])
 	}
-	if !strings.Contains(lines[6], "session 0") || !strings.HasPrefix(lines[6], "▌") {
-		t.Errorf("best match should be on the bottom row and selected: %q", lines[6])
+	if !strings.Contains(lines[7], "session 0") || !strings.HasPrefix(lines[7], "▌") {
+		t.Errorf("best match should be on the bottom row and selected: %q", lines[7])
 	}
 
-	// Input box (lines 7-9).
-	if !strings.HasPrefix(lines[7], "╭") || !strings.Contains(lines[8], "❯") || !strings.HasPrefix(lines[9], "╰") {
-		t.Errorf("input box: %q / %q / %q", lines[7], lines[8], lines[9])
+	// Input box (lines 8-10) follows the list.
+	if !strings.HasPrefix(lines[8], "╭") || !strings.Contains(lines[9], "❯") || !strings.HasPrefix(lines[10], "╰") {
+		t.Errorf("input box: %q / %q / %q", lines[8], lines[9], lines[10])
+	}
+
+	// Preview (lines 11-15) shows one flattened line per role.
+	if !strings.HasPrefix(lines[11], "╭") || !strings.Contains(lines[12], "you: user prompt 0") ||
+		!strings.Contains(lines[13], "claude: assistant reply 0") || !strings.HasPrefix(lines[15], "╰") {
+		t.Errorf("preview box: %q / %q / %q / %q / %q", lines[11], lines[12], lines[13], lines[14], lines[15])
 	}
 }
 
 func TestViewFollowsCursor(t *testing.T) {
-	m, _ := update(t, newModel(testSessions(2), ""), tea.WindowSizeMsg{Width: 100, Height: 10})
+	m, _ := update(t, newModel(testSessions(2), ""), tea.WindowSizeMsg{Width: 100, Height: 16})
 	m, _ = update(t, m, key(tea.KeyUp, 0))
 	lines := viewLines(m)
 	if !strings.Contains(lines[1], "id-1") {
 		t.Errorf("detail should follow the cursor: %q", lines[1])
 	}
-	if !strings.HasPrefix(lines[5], "▌") || strings.HasPrefix(lines[6], "▌") {
-		t.Errorf("selection marker should move up: %q / %q", lines[5], lines[6])
+	if !strings.HasPrefix(lines[6], "▌") || strings.HasPrefix(lines[7], "▌") {
+		t.Errorf("selection marker should move up: %q / %q", lines[6], lines[7])
+	}
+	if !strings.Contains(lines[12], "you: user prompt 1") || !strings.Contains(lines[13], "claude: assistant reply 1") {
+		t.Errorf("preview should follow the cursor: %q / %q", lines[12], lines[13])
+	}
+}
+
+func TestViewPreviewUsesFullWidthForSingleLineMessages(t *testing.T) {
+	sessions := testSessions(1)
+	sessions[0].preview = []previewMessage{
+		{role: "you", text: strings.Repeat("user words ", 20)},
+		{role: "claude", text: strings.Repeat("assistant words ", 20)},
+	}
+	m, _ := update(t, newModel(sessions, ""), tea.WindowSizeMsg{Width: 40, Height: 30})
+	lines := viewLines(m)
+	if len(lines) != 30 {
+		t.Fatalf("want 30 lines, got %d", len(lines))
+	}
+
+	start := 3 + m.listHeight() + 3
+	if !strings.HasPrefix(lines[start], "╭") || !strings.HasPrefix(lines[start+9], "╰") {
+		t.Fatalf("preview box should occupy 10 rows at height 30: %q / %q", lines[start], lines[start+9])
+	}
+	for _, i := range []int{start + 1, start + 2} {
+		if ansi.StringWidth(lines[i]) != 40 {
+			t.Errorf("preview line %d should use the available width: %d columns: %q", i, ansi.StringWidth(lines[i]), lines[i])
+		}
+	}
+	if !strings.Contains(lines[start+1], "you: user words") || !strings.Contains(lines[start+2], "claude: assistant words") {
+		t.Errorf("preview should show one line per role: %q / %q", lines[start+1], lines[start+2])
+	}
+}
+
+func TestViewShowsRecentMessages(t *testing.T) {
+	sessions := testSessions(1)
+	sessions[0].preview = nil
+	for i := range 6 {
+		sessions[0].preview = append(sessions[0].preview,
+			previewMessage{role: "you", text: fmt.Sprintf("prompt %d", i)},
+			previewMessage{role: "claude", text: fmt.Sprintf("reply %d", i)},
+		)
+	}
+	m, _ := update(t, newModel(sessions, ""), tea.WindowSizeMsg{Width: 100, Height: 30})
+	lines := viewLines(m)
+	start := 3 + m.listHeight() + 3
+	if m.previewHeight() != 10 {
+		t.Fatalf("preview height = %d, want 10", m.previewHeight())
+	}
+	want := []string{
+		"you: prompt 2", "claude: reply 2",
+		"you: prompt 3", "claude: reply 3",
+		"you: prompt 4", "claude: reply 4",
+		"you: prompt 5", "claude: reply 5",
+	}
+	for i, text := range want {
+		if !strings.Contains(lines[start+1+i], text) {
+			t.Errorf("preview row %d = %q, want %q", i, lines[start+1+i], text)
+		}
+	}
+}
+
+func TestPreviewMessageLineFlattensWhitespaceAndUsesAvailableWidth(t *testing.T) {
+	got := previewMessageLine("You", "\x1b[31mhello\n\nworld\x1b[0m", 40, lipgloss.NewStyle())
+	if plain := ansi.Strip(got); plain != "you: hello world" {
+		t.Errorf("flattened preview = %q, want %q", plain, "you: hello world")
+	}
+	long := previewMessageLine("Claude", strings.Repeat("word ", 20), 20, lipgloss.NewStyle())
+	plain := ansi.Strip(long)
+	if width := ansi.StringWidth(long); width != 20 {
+		t.Errorf("long preview width = %d, want 20: %q", width, plain)
+	}
+	if !strings.HasPrefix(plain, "claude: ") || !strings.HasSuffix(plain, "…") {
+		t.Errorf("long preview = %q", plain)
 	}
 }
 

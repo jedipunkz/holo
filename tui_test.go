@@ -380,9 +380,17 @@ func TestMoveScrolls(t *testing.T) {
 }
 
 func TestListHeight(t *testing.T) {
-	for h, want := range map[int]int{0: 1, 6: 1, 7: 1, 8: 2, 10: 4, 11: 1, 12: 2, 30: 20} {
+	for h, want := range map[int]int{0: 1, 6: 1, 7: 1, 8: 2, 10: 4, 12: 6, 13: 1, 14: 2, 16: 4, 24: 10, 30: 14} {
 		if got := (model{height: h}).listHeight(); got != want {
 			t.Errorf("height %d: %d, want %d", h, got, want)
+		}
+	}
+}
+
+func TestPreviewHeightScalesWithTerminal(t *testing.T) {
+	for h, want := range map[int]int{10: 0, 12: 0, 13: 6, 14: 6, 24: 8, 30: 10} {
+		if got := (model{height: h}).previewHeight(); got != want {
+			t.Errorf("height %d: preview height %d, want %d", h, got, want)
 		}
 	}
 }
@@ -459,15 +467,15 @@ func viewLines(m model) []string {
 
 func TestView(t *testing.T) {
 	ss := testSessions(2)
-	m, _ := update(t, newModel(ss, ""), tea.WindowSizeMsg{Width: 100, Height: 14})
+	m, _ := update(t, newModel(ss, ""), tea.WindowSizeMsg{Width: 100, Height: 16})
 	v := m.View()
 	if !v.AltScreen {
 		t.Error("AltScreen should be on")
 	}
 
 	lines := viewLines(m)
-	if len(lines) != 14 {
-		t.Fatalf("want 14 lines, got %d:\n%s", len(lines), strings.Join(lines, "\n"))
+	if len(lines) != 16 {
+		t.Fatalf("want 16 lines, got %d:\n%s", len(lines), strings.Join(lines, "\n"))
 	}
 	for i, l := range strings.Split(v.Content, "\n") {
 		if w := ansi.StringWidth(l); w > 100 {
@@ -499,20 +507,20 @@ func TestView(t *testing.T) {
 		t.Errorf("best match should be on the bottom row and selected: %q", lines[6])
 	}
 
-	// Preview (lines 7-10) follows the selected session.
+	// Preview (lines 7-12) follows the selected session.
 	if !strings.HasPrefix(lines[7], "╭") || !strings.Contains(lines[8], "user prompt 0") ||
-		!strings.Contains(lines[9], "assistant reply 0") || !strings.HasPrefix(lines[10], "╰") {
-		t.Errorf("preview box: %q / %q / %q / %q", lines[7], lines[8], lines[9], lines[10])
+		!strings.Contains(lines[9], "assistant reply 0") || !strings.HasPrefix(lines[12], "╰") {
+		t.Errorf("preview box: %q / %q / %q / %q", lines[7], lines[8], lines[9], lines[12])
 	}
 
-	// Input box (lines 11-13).
-	if !strings.HasPrefix(lines[11], "╭") || !strings.Contains(lines[12], "❯") || !strings.HasPrefix(lines[13], "╰") {
-		t.Errorf("input box: %q / %q / %q", lines[11], lines[12], lines[13])
+	// Input box (lines 13-15).
+	if !strings.HasPrefix(lines[13], "╭") || !strings.Contains(lines[14], "❯") || !strings.HasPrefix(lines[15], "╰") {
+		t.Errorf("input box: %q / %q / %q", lines[13], lines[14], lines[15])
 	}
 }
 
 func TestViewFollowsCursor(t *testing.T) {
-	m, _ := update(t, newModel(testSessions(2), ""), tea.WindowSizeMsg{Width: 100, Height: 14})
+	m, _ := update(t, newModel(testSessions(2), ""), tea.WindowSizeMsg{Width: 100, Height: 16})
 	m, _ = update(t, m, key(tea.KeyUp, 0))
 	lines := viewLines(m)
 	if !strings.Contains(lines[1], "id-1") {
@@ -526,10 +534,41 @@ func TestViewFollowsCursor(t *testing.T) {
 	}
 }
 
-func TestPreviewLineFlattensAndTruncatesContent(t *testing.T) {
-	got := previewLine("You", "\x1b[31mhello\x1b[0m\nworld", 12, lipgloss.NewStyle())
-	if plain := ansi.Strip(got); plain != "You: hello…" {
-		t.Errorf("preview = %q, want %q", plain, "You: hello…")
+func TestViewLargePreviewWrapsConversation(t *testing.T) {
+	sessions := testSessions(1)
+	sessions[0].PreviewUser = strings.Repeat("user words ", 20)
+	sessions[0].PreviewAssistant = strings.Repeat("assistant words ", 20)
+	m, _ := update(t, newModel(sessions, ""), tea.WindowSizeMsg{Width: 40, Height: 24})
+	lines := viewLines(m)
+	if len(lines) != 24 {
+		t.Fatalf("want 24 lines, got %d", len(lines))
+	}
+
+	start := 3 + m.listHeight()
+	if !strings.HasPrefix(lines[start], "╭") || !strings.HasPrefix(lines[start+7], "╰") {
+		t.Fatalf("preview box should occupy 8 rows at height 24: %q / %q", lines[start], lines[start+7])
+	}
+	if !strings.Contains(lines[start+1], "You: user words") ||
+		!strings.Contains(lines[start+2], "user words") ||
+		!strings.Contains(lines[start+4], "Claude: assistant words") ||
+		!strings.Contains(lines[start+5], "assistant words") {
+		t.Errorf("conversation should wrap across the preview area: %q", lines[start:start+8])
+	}
+}
+
+func TestPreviewLinesWrapAndLimitContent(t *testing.T) {
+	got := previewLines("You", "\x1b[31mhello world\x1b[0m\nagain more words", 12, 2, lipgloss.NewStyle())
+	if len(got) != 2 {
+		t.Fatalf("got %d lines, want 2: %q", len(got), got)
+	}
+	plain := []string{ansi.Strip(got[0]), ansi.Strip(got[1])}
+	if plain[0] != "You: hello" || !strings.Contains(plain[1], "world") || !strings.HasSuffix(plain[1], "…") {
+		t.Errorf("preview lines = %q", plain)
+	}
+	for i, line := range got {
+		if width := ansi.StringWidth(line); width > 12 {
+			t.Errorf("line %d width %d exceeds 12: %q", i, width, line)
+		}
 	}
 }
 

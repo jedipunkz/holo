@@ -91,8 +91,8 @@ Built with [Bubble Tea v2](https://charm.land/bubbletea), Bubbles v2
 ...
 ▌MM-DD HH:MM   3h ago  project               branch            title   (best match / newest)
 ╭──────────────────────────────────────────────╮
-│You: <latest prompt>                           │
-│Claude: <latest reply>                          │
+│You: <latest prompt, wrapped across lines>       │
+│Claude: <latest reply, wrapped across lines>     │
 ╰──────────────────────────────────────────────╯
 ╭──────────────────────────────────────────────╮
 │❯ search box                                  │
@@ -110,7 +110,8 @@ Built with [Bubble Tea v2](https://charm.land/bubbletea), Bubbles v2
 The list is drawn bottom-up like fzf: the best match (or the newest session
 for an empty query) is on the bottom row and selected first.
 The latest user prompt and Claude reply for the selected session appear below
-the list; each preview line is truncated to the terminal width.
+the list. The panel grows to up to 10 rows as terminal height allows; long
+messages wrap to the terminal width and are clipped when they exceed the panel.
 
 Columns are truncated and padded by display width, so CJK titles align.
 Colors follow the TokyoNight dark palette: accent and fuzzy-matched characters

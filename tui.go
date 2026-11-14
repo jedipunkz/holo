@@ -103,10 +103,7 @@ type model struct {
 	chosen   *Session
 }
 
-const (
-	minPreviewBoxHeight = 8
-	maxPreviewBoxHeight = 10
-)
+const previewBoxHeight = 4
 
 func newModel(sessions []Session, query string) model {
 	in := textinput.New()
@@ -170,10 +167,10 @@ func (m *model) move(d int) {
 
 // previewHeight reserves room for the preview when the terminal can fit it.
 func (m model) previewHeight() int {
-	if m.height < 7+minPreviewBoxHeight {
+	if m.height < 7+previewBoxHeight {
 		return 0
 	}
-	return min(maxPreviewBoxHeight, max(minPreviewBoxHeight, m.height/3))
+	return previewBoxHeight
 }
 
 // listHeight leaves room for the detail, preview, and input boxes.
@@ -204,31 +201,21 @@ func (m model) View() tea.View {
 	}
 	b.WriteString(box.Width(m.width).Render(m.input.View()) + "\n")
 	if m.previewHeight() > 0 {
-		inner := max(1, m.width-2)
-		innerHeight := m.previewHeight() - 2
-		var previewLinesContent []string
+		inner := max(0, m.width-2)
+		previewLinesContent := []string{
+			previewMessageLine("preview", "No session selected", inner, dimStyle),
+			"",
+		}
 		if len(m.matches) > 0 {
 			s := m.sessions[m.matches[m.cursor].idx]
 			assistant := s.PreviewAssistant
 			if assistant == "" {
 				assistant = "(no response yet)"
 			}
-			bodyHeight := innerHeight - 2 // one heading per role
-			userHeight := (bodyHeight + 1) / 2
-			assistantHeight := bodyHeight / 2
-			previewLinesContent = append(
-				previewLinesContent,
-				previewMessageLines("you", s.PreviewUser, inner, userHeight, lipgloss.NewStyle().Foreground(projectColor))...,
-			)
-			previewLinesContent = append(
-				previewLinesContent,
-				previewMessageLines("claude", assistant, inner, assistantHeight, lipgloss.NewStyle().Foreground(titleColor))...,
-			)
-		} else {
-			previewLinesContent = previewMessageLines("preview", "No session selected", inner, innerHeight-1, dimStyle)
-		}
-		for len(previewLinesContent) < innerHeight {
-			previewLinesContent = append(previewLinesContent, "")
+			previewLinesContent = []string{
+				previewMessageLine("you", s.PreviewUser, inner, lipgloss.NewStyle().Foreground(projectColor)),
+				previewMessageLine("claude", assistant, inner, lipgloss.NewStyle().Foreground(titleColor)),
+			}
 		}
 		b.WriteString(box.Width(m.width).Render(strings.Join(previewLinesContent, "\n")))
 	}
@@ -261,34 +248,24 @@ func (m model) row(mt match, selected bool) string {
 	return ansi.Truncate(line, m.width, "")
 }
 
-func previewMessageLines(label, text string, width, bodyHeight int, style lipgloss.Style) []string {
-	if bodyHeight <= 0 {
-		return nil
-	}
+func previewMessageLine(label, text string, width int, style lipgloss.Style) string {
 	text = ansi.Strip(text)
 	text = strings.Map(func(r rune) rune {
-		if unicode.IsControl(r) && r != '\n' {
+		if unicode.IsControl(r) {
 			return ' '
 		}
 		return r
 	}, text)
-	text = strings.TrimSpace(text)
+	text = oneLine(text)
 	if text == "" {
 		text = "(empty)"
 	}
-	indent := min(2, max(0, width))
-	textWidth := max(1, width-indent)
-	body := strings.Split(ansi.Wrap(text, textWidth, " "), "\n")
-	if len(body) > bodyHeight {
-		body = body[:bodyHeight]
-		last := strings.TrimRight(body[bodyHeight-1], " ")
-		body[bodyHeight-1] = ansi.Truncate(last, max(0, textWidth-1), "") + "…"
+	prefix := strings.ToLower(label) + ": "
+	line := ansi.Truncate(prefix+text, max(0, width), "…")
+	if strings.HasPrefix(line, prefix) {
+		return style.Bold(true).Render(prefix) + style.Render(line[len(prefix):])
 	}
-	lines := []string{style.Bold(true).Render(strings.ToLower(label) + ":")}
-	for _, line := range body {
-		lines = append(lines, strings.Repeat(" ", indent)+style.Render(line))
-	}
-	return lines
+	return style.Bold(true).Render(line)
 }
 
 // ago formats d coarsely, e.g. "5m ago" (at most 8 columns).

@@ -504,19 +504,16 @@ func TestView(t *testing.T) {
 		t.Errorf("best match should be on the bottom row and selected: %q", lines[4])
 	}
 
-	// Preview (lines 5-12) separates role headings from indented message text.
-	if !strings.HasPrefix(lines[5], "╭") || !strings.Contains(lines[6], "you:") ||
-		!strings.Contains(lines[7], "user prompt 0") || !strings.Contains(lines[10], "claude:") ||
-		!strings.Contains(lines[11], "assistant reply 0") || !strings.HasPrefix(lines[12], "╰") {
-		t.Errorf("preview box: %q", strings.Join(lines[5:13], " / "))
-	}
-	if strings.Trim(lines[9], " │") != "" {
-		t.Errorf("expected blank separator between messages: %q", lines[9])
+	// Input box (lines 5-7) follows the list.
+	if !strings.HasPrefix(lines[5], "╭") || !strings.Contains(lines[6], "❯") || !strings.HasPrefix(lines[7], "╰") {
+		t.Errorf("input box: %q / %q / %q", lines[5], lines[6], lines[7])
 	}
 
-	// Input box (lines 13-15).
-	if !strings.HasPrefix(lines[13], "╭") || !strings.Contains(lines[14], "❯") || !strings.HasPrefix(lines[15], "╰") {
-		t.Errorf("input box: %q / %q / %q", lines[13], lines[14], lines[15])
+	// Preview (lines 8-15) follows the input and separates role headings.
+	if !strings.HasPrefix(lines[8], "╭") || !strings.Contains(lines[9], "you:") ||
+		!strings.Contains(lines[10], "user prompt 0") || !strings.Contains(lines[11], "claude:") ||
+		!strings.Contains(lines[12], "assistant reply 0") || !strings.HasPrefix(lines[15], "╰") {
+		t.Errorf("preview box: %q", strings.Join(lines[8:16], " / "))
 	}
 }
 
@@ -530,9 +527,9 @@ func TestViewFollowsCursor(t *testing.T) {
 	if !strings.HasPrefix(lines[3], "▌") || strings.HasPrefix(lines[4], "▌") {
 		t.Errorf("selection marker should move up: %q / %q", lines[3], lines[4])
 	}
-	if !strings.Contains(lines[6], "you:") || !strings.Contains(lines[7], "user prompt 1") ||
-		!strings.Contains(lines[10], "claude:") || !strings.Contains(lines[11], "assistant reply 1") {
-		t.Errorf("preview should follow the cursor: %q", strings.Join(lines[5:13], " / "))
+	if !strings.Contains(lines[9], "you:") || !strings.Contains(lines[10], "user prompt 1") ||
+		!strings.Contains(lines[11], "claude:") || !strings.Contains(lines[12], "assistant reply 1") {
+		t.Errorf("preview should follow the cursor: %q", strings.Join(lines[8:16], " / "))
 	}
 }
 
@@ -546,15 +543,15 @@ func TestViewLargePreviewWrapsConversation(t *testing.T) {
 		t.Fatalf("want 30 lines, got %d", len(lines))
 	}
 
-	start := 3 + m.listHeight()
+	start := 3 + m.listHeight() + 3
 	if !strings.HasPrefix(lines[start], "╭") || !strings.HasPrefix(lines[start+9], "╰") {
 		t.Fatalf("preview box should occupy 10 rows at height 30: %q / %q", lines[start], lines[start+9])
 	}
 	if !strings.Contains(lines[start+1], "you:") ||
 		!strings.Contains(lines[start+2], "user words") ||
-		!strings.Contains(lines[start+6], "claude:") ||
-		!strings.Contains(lines[start+7], "assistant words") ||
-		!strings.Contains(lines[start+8], "assistant words") {
+		!strings.Contains(lines[start+5], "claude:") ||
+		!strings.Contains(lines[start+6], "assistant words") ||
+		!strings.Contains(lines[start+7], "assistant words") {
 		t.Errorf("conversation should wrap across the preview area: %q", lines[start:start+10])
 	}
 }

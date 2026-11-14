@@ -202,6 +202,7 @@ func (m model) View() tea.View {
 		}
 		b.WriteString(m.row(m.matches[i], i == m.cursor) + "\n")
 	}
+	b.WriteString(box.Width(m.width).Render(m.input.View()) + "\n")
 	if m.previewHeight() > 0 {
 		inner := max(1, m.width-2)
 		innerHeight := m.previewHeight() - 2
@@ -212,14 +213,13 @@ func (m model) View() tea.View {
 			if assistant == "" {
 				assistant = "(no response yet)"
 			}
-			bodyHeight := innerHeight - 3 // two role headings and a blank separator
+			bodyHeight := innerHeight - 2 // one heading per role
 			userHeight := (bodyHeight + 1) / 2
 			assistantHeight := bodyHeight / 2
 			previewLinesContent = append(
 				previewLinesContent,
 				previewMessageLines("you", s.PreviewUser, inner, userHeight, lipgloss.NewStyle().Foreground(projectColor))...,
 			)
-			previewLinesContent = append(previewLinesContent, "")
 			previewLinesContent = append(
 				previewLinesContent,
 				previewMessageLines("claude", assistant, inner, assistantHeight, lipgloss.NewStyle().Foreground(titleColor))...,
@@ -230,9 +230,8 @@ func (m model) View() tea.View {
 		for len(previewLinesContent) < innerHeight {
 			previewLinesContent = append(previewLinesContent, "")
 		}
-		b.WriteString(box.Width(m.width).Render(strings.Join(previewLinesContent, "\n")) + "\n")
+		b.WriteString(box.Width(m.width).Render(strings.Join(previewLinesContent, "\n")))
 	}
-	b.WriteString(box.Width(m.width).Render(m.input.View()))
 
 	v := tea.NewView(b.String())
 	v.AltScreen = true
@@ -284,9 +283,6 @@ func previewMessageLines(label, text string, width, bodyHeight int, style lipglo
 		body = body[:bodyHeight]
 		last := strings.TrimRight(body[bodyHeight-1], " ")
 		body[bodyHeight-1] = ansi.Truncate(last, max(0, textWidth-1), "") + "…"
-	}
-	for len(body) < bodyHeight {
-		body = append(body, "")
 	}
 	lines := []string{style.Bold(true).Render(strings.ToLower(label) + ":")}
 	for _, line := range body {

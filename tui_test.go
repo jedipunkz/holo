@@ -380,7 +380,7 @@ func TestMoveScrolls(t *testing.T) {
 }
 
 func TestListHeight(t *testing.T) {
-	for h, want := range map[int]int{0: 1, 6: 1, 7: 1, 8: 2, 10: 4, 12: 6, 13: 1, 14: 2, 16: 4, 24: 10, 30: 14} {
+	for h, want := range map[int]int{0: 1, 6: 1, 7: 1, 8: 2, 10: 4, 12: 6, 14: 8, 15: 1, 16: 2, 24: 10, 30: 14} {
 		if got := (model{height: h}).listHeight(); got != want {
 			t.Errorf("height %d: %d, want %d", h, got, want)
 		}
@@ -388,7 +388,7 @@ func TestListHeight(t *testing.T) {
 }
 
 func TestPreviewHeightScalesWithTerminal(t *testing.T) {
-	for h, want := range map[int]int{10: 0, 12: 0, 13: 6, 14: 6, 24: 8, 30: 10} {
+	for h, want := range map[int]int{10: 0, 14: 0, 15: 8, 16: 8, 24: 8, 30: 10} {
 		if got := (model{height: h}).previewHeight(); got != want {
 			t.Errorf("height %d: preview height %d, want %d", h, got, want)
 		}
@@ -496,21 +496,22 @@ func TestView(t *testing.T) {
 		t.Errorf("count should be right-aligned: %q", lines[1])
 	}
 
-	// List (lines 3-6): blank rows on top, best match on the bottom row.
-	if lines[3] != "" || lines[4] != "" {
-		t.Errorf("unused rows should be blank and on top: %q %q", lines[3], lines[4])
+	// List (lines 3-4): the best match is on the bottom row.
+	if !strings.Contains(lines[3], "session 1") || strings.HasPrefix(lines[3], "▌") {
+		t.Errorf("second match row: %q", lines[3])
 	}
-	if !strings.Contains(lines[5], "session 1") || strings.HasPrefix(lines[5], "▌") {
-		t.Errorf("second match row: %q", lines[5])
-	}
-	if !strings.Contains(lines[6], "session 0") || !strings.HasPrefix(lines[6], "▌") {
-		t.Errorf("best match should be on the bottom row and selected: %q", lines[6])
+	if !strings.Contains(lines[4], "session 0") || !strings.HasPrefix(lines[4], "▌") {
+		t.Errorf("best match should be on the bottom row and selected: %q", lines[4])
 	}
 
-	// Preview (lines 7-12) follows the selected session.
-	if !strings.HasPrefix(lines[7], "╭") || !strings.Contains(lines[8], "user prompt 0") ||
-		!strings.Contains(lines[9], "assistant reply 0") || !strings.HasPrefix(lines[12], "╰") {
-		t.Errorf("preview box: %q / %q / %q / %q", lines[7], lines[8], lines[9], lines[12])
+	// Preview (lines 5-12) separates role headings from indented message text.
+	if !strings.HasPrefix(lines[5], "╭") || !strings.Contains(lines[6], "you:") ||
+		!strings.Contains(lines[7], "user prompt 0") || !strings.Contains(lines[10], "claude:") ||
+		!strings.Contains(lines[11], "assistant reply 0") || !strings.HasPrefix(lines[12], "╰") {
+		t.Errorf("preview box: %q", strings.Join(lines[5:13], " / "))
+	}
+	if strings.Trim(lines[9], " │") != "" {
+		t.Errorf("expected blank separator between messages: %q", lines[9])
 	}
 
 	// Input box (lines 13-15).
@@ -526,11 +527,12 @@ func TestViewFollowsCursor(t *testing.T) {
 	if !strings.Contains(lines[1], "id-1") {
 		t.Errorf("detail should follow the cursor: %q", lines[1])
 	}
-	if !strings.HasPrefix(lines[5], "▌") || strings.HasPrefix(lines[6], "▌") {
-		t.Errorf("selection marker should move up: %q / %q", lines[5], lines[6])
+	if !strings.HasPrefix(lines[3], "▌") || strings.HasPrefix(lines[4], "▌") {
+		t.Errorf("selection marker should move up: %q / %q", lines[3], lines[4])
 	}
-	if !strings.Contains(lines[8], "user prompt 1") || !strings.Contains(lines[9], "assistant reply 1") {
-		t.Errorf("preview should follow the cursor: %q / %q", lines[8], lines[9])
+	if !strings.Contains(lines[6], "you:") || !strings.Contains(lines[7], "user prompt 1") ||
+		!strings.Contains(lines[10], "claude:") || !strings.Contains(lines[11], "assistant reply 1") {
+		t.Errorf("preview should follow the cursor: %q", strings.Join(lines[5:13], " / "))
 	}
 }
 
@@ -538,36 +540,37 @@ func TestViewLargePreviewWrapsConversation(t *testing.T) {
 	sessions := testSessions(1)
 	sessions[0].PreviewUser = strings.Repeat("user words ", 20)
 	sessions[0].PreviewAssistant = strings.Repeat("assistant words ", 20)
-	m, _ := update(t, newModel(sessions, ""), tea.WindowSizeMsg{Width: 40, Height: 24})
+	m, _ := update(t, newModel(sessions, ""), tea.WindowSizeMsg{Width: 40, Height: 30})
 	lines := viewLines(m)
-	if len(lines) != 24 {
-		t.Fatalf("want 24 lines, got %d", len(lines))
+	if len(lines) != 30 {
+		t.Fatalf("want 30 lines, got %d", len(lines))
 	}
 
 	start := 3 + m.listHeight()
-	if !strings.HasPrefix(lines[start], "╭") || !strings.HasPrefix(lines[start+7], "╰") {
-		t.Fatalf("preview box should occupy 8 rows at height 24: %q / %q", lines[start], lines[start+7])
+	if !strings.HasPrefix(lines[start], "╭") || !strings.HasPrefix(lines[start+9], "╰") {
+		t.Fatalf("preview box should occupy 10 rows at height 30: %q / %q", lines[start], lines[start+9])
 	}
-	if !strings.Contains(lines[start+1], "You: user words") ||
+	if !strings.Contains(lines[start+1], "you:") ||
 		!strings.Contains(lines[start+2], "user words") ||
-		!strings.Contains(lines[start+4], "Claude: assistant words") ||
-		!strings.Contains(lines[start+5], "assistant words") {
-		t.Errorf("conversation should wrap across the preview area: %q", lines[start:start+8])
+		!strings.Contains(lines[start+6], "claude:") ||
+		!strings.Contains(lines[start+7], "assistant words") ||
+		!strings.Contains(lines[start+8], "assistant words") {
+		t.Errorf("conversation should wrap across the preview area: %q", lines[start:start+10])
 	}
 }
 
 func TestPreviewLinesWrapAndLimitContent(t *testing.T) {
-	got := previewLines("You", "\x1b[31mhello world\x1b[0m\nagain more words", 12, 2, lipgloss.NewStyle())
-	if len(got) != 2 {
-		t.Fatalf("got %d lines, want 2: %q", len(got), got)
+	got := previewMessageLines("You", "\x1b[31mhello world\x1b[0m\nagain more words", 14, 2, lipgloss.NewStyle())
+	if len(got) != 3 {
+		t.Fatalf("got %d lines, want 3: %q", len(got), got)
 	}
-	plain := []string{ansi.Strip(got[0]), ansi.Strip(got[1])}
-	if plain[0] != "You: hello" || !strings.Contains(plain[1], "world") || !strings.HasSuffix(plain[1], "…") {
+	plain := []string{ansi.Strip(got[0]), ansi.Strip(got[1]), ansi.Strip(got[2])}
+	if plain[0] != "you:" || !strings.Contains(plain[1], "hello world") || !strings.HasSuffix(plain[2], "…") {
 		t.Errorf("preview lines = %q", plain)
 	}
 	for i, line := range got {
-		if width := ansi.StringWidth(line); width > 12 {
-			t.Errorf("line %d width %d exceeds 12: %q", i, width, line)
+		if width := ansi.StringWidth(line); width > 14 {
+			t.Errorf("line %d width %d exceeds 14: %q", i, width, line)
 		}
 	}
 }

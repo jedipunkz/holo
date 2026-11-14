@@ -104,7 +104,7 @@ type model struct {
 }
 
 const (
-	minPreviewBoxHeight = 6
+	minPreviewBoxHeight = 8
 	maxPreviewBoxHeight = 10
 )
 
@@ -212,18 +212,20 @@ func (m model) View() tea.View {
 			if assistant == "" {
 				assistant = "(no response yet)"
 			}
-			userHeight := (innerHeight + 1) / 2
-			assistantHeight := innerHeight / 2
+			bodyHeight := innerHeight - 3 // two role headings and a blank separator
+			userHeight := (bodyHeight + 1) / 2
+			assistantHeight := bodyHeight / 2
 			previewLinesContent = append(
 				previewLinesContent,
-				previewLines("You", s.PreviewUser, inner, userHeight, lipgloss.NewStyle().Foreground(projectColor))...,
+				previewMessageLines("you", s.PreviewUser, inner, userHeight, lipgloss.NewStyle().Foreground(projectColor))...,
 			)
+			previewLinesContent = append(previewLinesContent, "")
 			previewLinesContent = append(
 				previewLinesContent,
-				previewLines("Claude", assistant, inner, assistantHeight, lipgloss.NewStyle().Foreground(titleColor))...,
+				previewMessageLines("claude", assistant, inner, assistantHeight, lipgloss.NewStyle().Foreground(titleColor))...,
 			)
 		} else {
-			previewLinesContent = previewLines("Preview", "No session selected", inner, innerHeight, dimStyle)
+			previewLinesContent = previewMessageLines("preview", "No session selected", inner, innerHeight-1, dimStyle)
 		}
 		for len(previewLinesContent) < innerHeight {
 			previewLinesContent = append(previewLinesContent, "")
@@ -260,8 +262,8 @@ func (m model) row(mt match, selected bool) string {
 	return ansi.Truncate(line, m.width, "")
 }
 
-func previewLines(label, text string, width, maxLines int, style lipgloss.Style) []string {
-	if maxLines <= 0 {
+func previewMessageLines(label, text string, width, bodyHeight int, style lipgloss.Style) []string {
+	if bodyHeight <= 0 {
 		return nil
 	}
 	text = ansi.Strip(text)
@@ -275,15 +277,20 @@ func previewLines(label, text string, width, maxLines int, style lipgloss.Style)
 	if text == "" {
 		text = "(empty)"
 	}
-	width = max(1, width)
-	lines := strings.Split(ansi.Wrap(label+": "+text, width, " "), "\n")
-	if len(lines) > maxLines {
-		lines = lines[:maxLines]
-		last := strings.TrimRight(lines[maxLines-1], " ")
-		lines[maxLines-1] = ansi.Truncate(last, max(0, width-1), "") + "…"
+	indent := min(2, max(0, width))
+	textWidth := max(1, width-indent)
+	body := strings.Split(ansi.Wrap(text, textWidth, " "), "\n")
+	if len(body) > bodyHeight {
+		body = body[:bodyHeight]
+		last := strings.TrimRight(body[bodyHeight-1], " ")
+		body[bodyHeight-1] = ansi.Truncate(last, max(0, textWidth-1), "") + "…"
 	}
-	for i := range lines {
-		lines[i] = style.Render(lines[i])
+	for len(body) < bodyHeight {
+		body = append(body, "")
+	}
+	lines := []string{style.Bold(true).Render(strings.ToLower(label) + ":")}
+	for _, line := range body {
+		lines = append(lines, strings.Repeat(" ", indent)+style.Render(line))
 	}
 	return lines
 }

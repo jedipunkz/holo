@@ -294,7 +294,10 @@ func isQuit(cmd tea.Cmd) bool {
 func testSessions(n int) []Session {
 	ss := make([]Session, n)
 	for i := range ss {
-		ss[i] = Session{ID: fmt.Sprintf("id-%d", i), Title: fmt.Sprintf("session %d", i), CWD: fmt.Sprintf("/w/p%d", i)}
+		ss[i] = Session{
+			ID: fmt.Sprintf("id-%d", i), Title: fmt.Sprintf("session %d", i), CWD: fmt.Sprintf("/w/p%d", i),
+			PreviewUser: fmt.Sprintf("user prompt %d", i), PreviewAssistant: fmt.Sprintf("assistant reply %d", i),
+		}
 	}
 	return ss
 }
@@ -377,7 +380,7 @@ func TestMoveScrolls(t *testing.T) {
 }
 
 func TestListHeight(t *testing.T) {
-	for h, want := range map[int]int{0: 1, 6: 1, 7: 1, 8: 2, 30: 24} {
+	for h, want := range map[int]int{0: 1, 6: 1, 7: 1, 8: 2, 10: 4, 11: 1, 12: 2, 30: 20} {
 		if got := (model{height: h}).listHeight(); got != want {
 			t.Errorf("height %d: %d, want %d", h, got, want)
 		}
@@ -456,15 +459,15 @@ func viewLines(m model) []string {
 
 func TestView(t *testing.T) {
 	ss := testSessions(2)
-	m, _ := update(t, newModel(ss, ""), tea.WindowSizeMsg{Width: 100, Height: 10})
+	m, _ := update(t, newModel(ss, ""), tea.WindowSizeMsg{Width: 100, Height: 14})
 	v := m.View()
 	if !v.AltScreen {
 		t.Error("AltScreen should be on")
 	}
 
 	lines := viewLines(m)
-	if len(lines) != 10 {
-		t.Fatalf("want 10 lines, got %d:\n%s", len(lines), strings.Join(lines, "\n"))
+	if len(lines) != 14 {
+		t.Fatalf("want 14 lines, got %d:\n%s", len(lines), strings.Join(lines, "\n"))
 	}
 	for i, l := range strings.Split(v.Content, "\n") {
 		if w := ansi.StringWidth(l); w > 100 {
@@ -496,14 +499,20 @@ func TestView(t *testing.T) {
 		t.Errorf("best match should be on the bottom row and selected: %q", lines[6])
 	}
 
-	// Input box (lines 7-9).
-	if !strings.HasPrefix(lines[7], "╭") || !strings.Contains(lines[8], "❯") || !strings.HasPrefix(lines[9], "╰") {
-		t.Errorf("input box: %q / %q / %q", lines[7], lines[8], lines[9])
+	// Preview (lines 7-10) follows the selected session.
+	if !strings.HasPrefix(lines[7], "╭") || !strings.Contains(lines[8], "user prompt 0") ||
+		!strings.Contains(lines[9], "assistant reply 0") || !strings.HasPrefix(lines[10], "╰") {
+		t.Errorf("preview box: %q / %q / %q / %q", lines[7], lines[8], lines[9], lines[10])
+	}
+
+	// Input box (lines 11-13).
+	if !strings.HasPrefix(lines[11], "╭") || !strings.Contains(lines[12], "❯") || !strings.HasPrefix(lines[13], "╰") {
+		t.Errorf("input box: %q / %q / %q", lines[11], lines[12], lines[13])
 	}
 }
 
 func TestViewFollowsCursor(t *testing.T) {
-	m, _ := update(t, newModel(testSessions(2), ""), tea.WindowSizeMsg{Width: 100, Height: 10})
+	m, _ := update(t, newModel(testSessions(2), ""), tea.WindowSizeMsg{Width: 100, Height: 14})
 	m, _ = update(t, m, key(tea.KeyUp, 0))
 	lines := viewLines(m)
 	if !strings.Contains(lines[1], "id-1") {
@@ -511,6 +520,16 @@ func TestViewFollowsCursor(t *testing.T) {
 	}
 	if !strings.HasPrefix(lines[5], "▌") || strings.HasPrefix(lines[6], "▌") {
 		t.Errorf("selection marker should move up: %q / %q", lines[5], lines[6])
+	}
+	if !strings.Contains(lines[8], "user prompt 1") || !strings.Contains(lines[9], "assistant reply 1") {
+		t.Errorf("preview should follow the cursor: %q / %q", lines[8], lines[9])
+	}
+}
+
+func TestPreviewLineFlattensAndTruncatesContent(t *testing.T) {
+	got := previewLine("You", "\x1b[31mhello\x1b[0m\nworld", 12, lipgloss.NewStyle())
+	if plain := ansi.Strip(got); plain != "You: hello…" {
+		t.Errorf("preview = %q, want %q", plain, "You: hello…")
 	}
 }
 

@@ -22,6 +22,9 @@ type Session struct {
 	FirstPrompt string    `json:"firstPrompt"`
 	LastPrompt  string    `json:"lastPrompt"`
 	Updated     time.Time `json:"updated"`
+	// PreviewUser and PreviewAssistant preserve the latest conversation exchange for the TUI.
+	PreviewUser      string `json:"-"`
+	PreviewAssistant string `json:"-"`
 	// Body is the lowercased user/assistant text, used for full-text search.
 	Body string `json:"-"`
 }
@@ -135,9 +138,17 @@ func apply(s *Session, body *strings.Builder, rec record) {
 		}
 		body.WriteString(t)
 		body.WriteByte('\n')
-		// Slash commands and injected context start with a tag; skip them as a title.
-		if rec.Type == "user" && !rec.IsMeta && s.FirstPrompt == "" && !strings.HasPrefix(t, "<") {
-			s.FirstPrompt = oneLine(t)
+		if rec.Type == "user" {
+			// Slash commands and injected context start with a tag; skip them as a prompt.
+			if !rec.IsMeta && !strings.HasPrefix(t, "<") {
+				s.PreviewUser = t
+				s.PreviewAssistant = ""
+				if s.FirstPrompt == "" {
+					s.FirstPrompt = oneLine(t)
+				}
+			}
+		} else if s.PreviewUser != "" {
+			s.PreviewAssistant = t
 		}
 	}
 }

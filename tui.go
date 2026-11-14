@@ -6,6 +6,7 @@ import (
 	"slices"
 	"strings"
 	"time"
+	"unicode"
 	"unicode/utf8"
 
 	"charm.land/bubbles/v2/textinput"
@@ -102,6 +103,8 @@ type model struct {
 	chosen   *Session
 }
 
+const previewBoxHeight = 4
+
 func newModel(sessions []Session, query string) model {
 	in := textinput.New()
 	in.Prompt = "❯ "
@@ -162,8 +165,16 @@ func (m *model) move(d int) {
 	}
 }
 
-// listHeight is the screen height minus the 3-line detail and input boxes.
-func (m model) listHeight() int { return max(1, m.height-6) }
+// previewHeight reserves room for the preview when the terminal can fit it.
+func (m model) previewHeight() int {
+	if m.height < 7+previewBoxHeight {
+		return 0
+	}
+	return previewBoxHeight
+}
+
+// listHeight leaves room for the detail, preview, and input boxes.
+func (m model) listHeight() int { return max(1, m.height-6-m.previewHeight()) }
 
 func (m model) View() tea.View {
 	var b strings.Builder
@@ -187,6 +198,22 @@ func (m model) View() tea.View {
 			continue
 		}
 		b.WriteString(m.row(m.matches[i], i == m.cursor) + "\n")
+	}
+	if m.previewHeight() > 0 {
+		user, assistant := "No session selected", ""
+		if len(m.matches) > 0 {
+			s := m.sessions[m.matches[m.cursor].idx]
+			user, assistant = s.PreviewUser, s.PreviewAssistant
+			if assistant == "" {
+				assistant = "(no response yet)"
+			}
+		}
+		inner := max(0, m.width-2)
+		preview := strings.Join([]string{
+			previewLine("You", user, inner, lipgloss.NewStyle().Foreground(projectColor)),
+			previewLine("Claude", assistant, inner, lipgloss.NewStyle().Foreground(titleColor)),
+		}, "\n")
+		b.WriteString(box.Width(m.width).Render(preview) + "\n")
 	}
 	b.WriteString(box.Width(m.width).Render(m.input.View()))
 
@@ -216,6 +243,25 @@ func (m model) row(mt match, selected bool) string {
 		mark(s.Branch, 16, mt.pos, len(s.Title)+1+len(proj)+1, base.Foreground(branchColor), hl) + sep +
 		mark(s.Title, titleW, mt.pos, 0, base.Foreground(titleColor), hl)
 	return ansi.Truncate(line, m.width, "")
+}
+
+func previewLine(label, text string, width int, style lipgloss.Style) string {
+	text = ansi.Strip(text)
+	text = strings.Map(func(r rune) rune {
+		if unicode.IsControl(r) {
+			return ' '
+		}
+		return r
+	}, text)
+	text = oneLine(text)
+	if text == "" {
+		text = "(empty)"
+	}
+	line := ansi.Truncate(label+": "+text, width, "…")
+	if strings.HasSuffix(line, "…") {
+		line = strings.TrimRight(strings.TrimSuffix(line, "…"), " ") + "…"
+	}
+	return style.Render(line)
 }
 
 // ago formats d coarsely, e.g. "5m ago" (at most 8 columns).

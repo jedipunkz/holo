@@ -39,6 +39,20 @@ func TestParse(t *testing.T) {
 	}
 }
 
+func TestParsePreviewUsesLastUserAndAssistantMessages(t *testing.T) {
+	input := `{"type":"user","message":{"content":"first prompt"}}
+{"type":"assistant","message":{"content":"first reply"}}
+{"type":"user","message":{"content":"latest prompt"}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","name":"Bash"},{"type":"text","text":"latest reply"}]}}
+{"type":"user","isMeta":true,"message":{"content":"hidden context"}}
+{"type":"user","message":{"content":"<command-name>/clear</command-name>"}}`
+
+	s := parse(strings.NewReader(input))
+	if s.PreviewUser != "latest prompt" || s.PreviewAssistant != "latest reply" {
+		t.Errorf("preview: user %q, assistant %q", s.PreviewUser, s.PreviewAssistant)
+	}
+}
+
 func TestParseEdgeCases(t *testing.T) {
 	long := strings.Repeat("x", 200_000) // larger than bufio.Scanner's 64 KiB default
 

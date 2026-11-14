@@ -79,7 +79,7 @@ holo honors `CLAUDE_CONFIG_DIR` the same way Claude Code does: when it is set,
 sessions are read from `$CLAUDE_CONFIG_DIR/projects` instead of
 `~/.claude/projects`.
 
-The colors follow the gruvbox dark palette and assume a dark terminal
+The colors follow the TokyoNight dark palette and assume a dark terminal
 background.
 
 ## Development

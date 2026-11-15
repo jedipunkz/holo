@@ -662,3 +662,13 @@ func TestViewBeforeWindowSize(t *testing.T) {
 		t.Error("empty view")
 	}
 }
+
+func TestFilterFuzzyNewestFirst(t *testing.T) {
+	sessions := []Session{
+		{Title: "fix the login bug", CWD: "/w/a"}, // newest, weaker fuzzy score
+		{Title: "login", CWD: "/w/b"},             // older, exact match
+	}
+	if got := idxs(filter(sessions, "login")); !slices.Equal(got, []int{0, 1}) {
+		t.Fatalf("fuzzy matches should be newest first: got %v", got)
+	}
+}

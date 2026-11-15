@@ -41,9 +41,9 @@ func header(s Session) string {
 }
 
 // filter returns the sessions matching query.
-// Fuzzy matches on title/project/branch come first (by score), then sessions
-// whose ID starts with the query, then sessions whose body contains every
-// query term (newest first). Prompts stay out of the
+// Fuzzy matches on title/project/branch come first, then sessions whose ID
+// starts with the query, then sessions whose body contains every query term.
+// Each group is newest first (sessions is sorted that way). Prompts stay out of the
 // fuzzy haystack because long text matches almost any subsequence.
 func filter(sessions []Session, query string) []match {
 	query = strings.TrimSpace(query)
@@ -60,7 +60,9 @@ func filter(sessions []Session, query string) []match {
 		headers[i] = header(s)
 	}
 	seen := make(map[int]bool)
-	for _, m := range fuzzy.Find(query, headers) {
+	fm := fuzzy.Find(query, headers)
+	slices.SortFunc(fm, func(a, b fuzzy.Match) int { return a.Index - b.Index })
+	for _, m := range fm {
 		res = append(res, match{idx: m.Index, pos: m.MatchedIndexes})
 		seen[m.Index] = true
 	}

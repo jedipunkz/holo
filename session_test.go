@@ -173,6 +173,18 @@ func TestParseEdgeCases(t *testing.T) {
 			},
 		},
 		{
+			name: "custom-title overrides ai-title regardless of order",
+			input: `{"type":"ai-title","aiTitle":"ai"}
+{"type":"custom-title","customTitle":"my\n name"}
+{"type":"ai-title","aiTitle":"ai again"}
+{"type":"custom-title","customTitle":""}`,
+			check: func(t *testing.T, s Session) {
+				if s.Title != "my name" {
+					t.Errorf("title: %q", s.Title)
+				}
+			},
+		},
+		{
 			name:  "last-prompt is flattened to one line",
 			input: `{"type":"last-prompt","lastPrompt":"a\n\tb"}`,
 			check: func(t *testing.T, s Session) {

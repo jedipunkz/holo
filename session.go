@@ -30,6 +30,9 @@ type Session struct {
 	LastPrompt  string    `json:"lastPrompt"`
 	Updated     time.Time `json:"updated"`
 	preview     []previewMessage
+	// renamed is true once a custom-title record (/rename) set Title,
+	// so a later ai-title record cannot overwrite it.
+	renamed bool
 	// Body is the lowercased user/assistant text, used for full-text search.
 	Body string `json:"-"`
 }
@@ -37,15 +40,16 @@ type Session struct {
 // record covers only the fields holo needs. The JSONL format is undocumented,
 // so unknown types and fields are ignored.
 type record struct {
-	Type       string    `json:"type"`
-	SessionID  string    `json:"sessionId"`
-	CWD        string    `json:"cwd"`
-	GitBranch  string    `json:"gitBranch"`
-	Timestamp  time.Time `json:"timestamp"`
-	IsMeta     bool      `json:"isMeta"`
-	AITitle    string    `json:"aiTitle"`
-	LastPrompt string    `json:"lastPrompt"`
-	Message    struct {
+	Type        string    `json:"type"`
+	SessionID   string    `json:"sessionId"`
+	CWD         string    `json:"cwd"`
+	GitBranch   string    `json:"gitBranch"`
+	Timestamp   time.Time `json:"timestamp"`
+	IsMeta      bool      `json:"isMeta"`
+	AITitle     string    `json:"aiTitle"`
+	CustomTitle string    `json:"customTitle"`
+	LastPrompt  string    `json:"lastPrompt"`
+	Message     struct {
 		Content json.RawMessage `json:"content"`
 	} `json:"message"`
 }
@@ -133,7 +137,14 @@ func apply(s *Session, body *strings.Builder, rec record) {
 	}
 	switch rec.Type {
 	case "ai-title":
-		s.Title = oneLine(rec.AITitle)
+		if !s.renamed {
+			s.Title = oneLine(rec.AITitle)
+		}
+	case "custom-title":
+		if t := oneLine(rec.CustomTitle); t != "" {
+			s.Title = t
+			s.renamed = true
+		}
 	case "last-prompt":
 		s.LastPrompt = oneLine(rec.LastPrompt)
 	case "user", "assistant":
